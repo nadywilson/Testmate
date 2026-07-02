@@ -1,0 +1,8 @@
+uploads/questions/*
+uploads/materials/*
+!uploads/questions/.gitkeep
+!uploads/materials/.gitkeep
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
