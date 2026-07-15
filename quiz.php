@@ -11,7 +11,7 @@ if ($_SESSION['role'] === 'admin') {
     echo '<div style="max-width:560px;margin:80px auto;text-align:center;">
         <div style="font-size:4rem;margin-bottom:16px;">🔐</div>
         <h2 style="font-size:22px;margin-bottom:10px;color:#2c3e50;">Administrator Account</h2>
-        <p style="color:#666;margin-bottom:24px;line-height:1.6;">Administrators cannot take quizzes.<br>Please login as a Learner to practice.</p>
+        <p style="color:#666;margin-bottom:24px;">Administrators cannot take quizzes. Please login as a Learner to practice.</p>
         <a href="/testmate/admin/index.php" class="btn btn-primary">Go to Admin Dashboard</a>
     </div>';
     include 'includes/footer.php';
@@ -21,6 +21,7 @@ if ($_SESSION['role'] === 'admin') {
 $topics    = $conn->query("SELECT * FROM topics ORDER BY id")->fetch_all(MYSQLI_ASSOC);
 $questions = [];
 $topic     = null;
+$mode      = $_GET['mode'] ?? 'normal'; // normal or retry
 
 if ($topic_id > 0) {
     $t = $conn->prepare("SELECT * FROM topics WHERE id = ?");
@@ -28,19 +29,41 @@ if ($topic_id > 0) {
     $t->execute();
     $topic = $t->get_result()->fetch_assoc();
 
-    $q = $conn->prepare("SELECT * FROM questions WHERE topic_id = ? ORDER BY RAND() LIMIT 10");
-    $q->bind_param("i", $topic_id);
-    $q->execute();
-    $questions = $q->get_result()->fetch_all(MYSQLI_ASSOC);
+    if ($mode === 'retry') {
+        // Get failed questions for this user and topic
+        $q = $conn->prepare("
+            SELECT q.* FROM questions q
+            JOIN failed_questions fq ON q.id = fq.question_id
+            WHERE fq.user_id = ? AND fq.topic_id = ?
+            ORDER BY fq.times_failed DESC
+            LIMIT 5
+        ");
+        $q->bind_param("ii", $user_id, $topic_id);
+        $q->execute();
+        $questions = $q->get_result()->fetch_all(MYSQLI_ASSOC);
+
+        // If no failed questions fall back to normal
+        if (empty($questions)) {
+            $mode = 'normal';
+        }
+    }
+
+    if ($mode === 'normal') {
+        $q = $conn->prepare("SELECT * FROM questions WHERE topic_id = ? ORDER BY RAND() LIMIT 5");
+        $q->bind_param("i", $topic_id);
+        $q->execute();
+        $questions = $q->get_result()->fetch_all(MYSQLI_ASSOC);
+    }
 }
 
+// Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $topic_id = (int)$_POST['topic_id'];
-    $qids     = $_POST['qids'];
-    $corrects = $_POST['correct'];
-    $total    = count($qids);
-    $score    = 0;
-    $results  = [];
+    $topic_id   = (int)$_POST['topic_id'];
+    $qids       = $_POST['qids'];
+    $corrects   = $_POST['correct'];
+    $total      = count($qids);
+    $score      = 0;
+    $results    = [];
 
     for ($i = 0; $i < $total; $i++) {
         $qid         = $qids[$i];
@@ -48,6 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $right       = strtoupper(trim($corrects[$i]));
         $is_correct  = ($user_answer === $right);
         if ($is_correct) $score++;
+
         $results[] = [
             'question'    => $_POST['qtexts'][$i],
             'user_answer' => $user_answer,
@@ -59,9 +83,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'option_d'    => $_POST['optd'][$i],
             'explanation' => $_POST['explanations'][$i],
             'image_path'  => $_POST['images'][$i],
+            'question_id' => $qid,
         ];
+
+        // Save or update failed questions
+        if (!$is_correct) {
+            $stmt = $conn->prepare("
+                INSERT INTO failed_questions (user_id, question_id, topic_id, times_failed)
+                VALUES (?, ?, ?, 1)
+                ON DUPLICATE KEY UPDATE times_failed = times_failed + 1, last_failed = NOW()
+            ");
+            $stmt->bind_param("iii", $user_id, $qid, $topic_id);
+            $stmt->execute();
+        } else {
+            // Remove from failed if they got it right
+            $stmt = $conn->prepare("DELETE FROM failed_questions WHERE user_id = ? AND question_id = ?");
+            $stmt->bind_param("ii", $user_id, $qid);
+            $stmt->execute();
+        }
     }
 
+    // Save score
     $save = $conn->prepare("INSERT INTO quiz_scores (user_id, topic_id, score, total) VALUES (?, ?, ?, ?)");
     $save->bind_param("iiii", $user_id, $topic_id, $score, $total);
     $save->execute();
@@ -81,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <div class="page-header">
     <h1>✅ Topic Quizzes</h1>
-    <p>Test yourself on one topic at a time and get instant feedback</p>
+    <p>5 questions per quiz · 15 minute timer · Instant feedback</p>
 </div>
 
 <div class="container">
@@ -98,10 +140,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $t->execute();
     $rtopic = $t->get_result()->fetch_assoc();
 
+    // Count failed questions for this topic
+    $fq = $conn->prepare("SELECT COUNT(*) AS cnt FROM failed_questions WHERE user_id = ? AND topic_id = ?");
+    $fq->bind_param("ii", $user_id, $tid);
+    $fq->execute();
+    $failed_count = $fq->get_result()->fetch_assoc()['cnt'];
+
     unset($_SESSION['quiz_results'], $_SESSION['quiz_score'],
           $_SESSION['quiz_total'], $_SESSION['quiz_topic_id'], $_SESSION['quiz_pct']);
 ?>
 
+    <!-- Score Banner -->
     <div style="border-radius:14px;padding:36px;text-align:center;color:white;margin-bottom:28px;
         background:<?= $percentage >= 80 ? 'linear-gradient(135deg,#27ae60,#2ecc71)' : ($percentage >= 60 ? 'linear-gradient(135deg,#e67e22,#f39c12)' : 'linear-gradient(135deg,#c0392b,#e74c3c)') ?>">
         <div style="font-size:56px;font-weight:800;line-height:1;"><?= $score ?>/<?= $total ?></div>
@@ -115,13 +164,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <p style="opacity:.9;font-size:15px;"><?= htmlspecialchars($rtopic['name']) ?> Quiz</p>
     </div>
 
+    <!-- Action Buttons -->
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px;">
-        <a href="/testmate/quiz.php?topic=<?= $tid ?>" class="btn btn-primary">🔄 Retry Quiz</a>
+        <a href="/testmate/quiz.php?topic=<?= $tid ?>" class="btn btn-primary">🔄 New Quiz</a>
+        <?php if ($failed_count > 0): ?>
+        <a href="/testmate/quiz.php?topic=<?= $tid ?>&mode=retry" class="btn btn-outline" style="border-color:#e74c3c;color:#e74c3c;">
+            ❌ Retry <?= $failed_count ?> Failed Question<?= $failed_count > 1 ? 's' : '' ?>
+        </a>
+        <?php endif; ?>
         <a href="/testmate/quiz.php" class="btn btn-outline">📋 All Topics</a>
-        <a href="/testmate/study-materials.php?topic=<?= $tid ?>" class="btn btn-outline">📖 Study This Topic</a>
+        <a href="/testmate/study-materials.php?topic=<?= $tid ?>" class="btn btn-outline">📖 Study</a>
         <a href="/testmate/dashboard.php" class="btn btn-outline">🏠 Dashboard</a>
     </div>
 
+    <!-- Answer Review -->
     <h2 style="font-size:18px;font-weight:700;margin-bottom:16px;">📋 Answer Review</h2>
 
     <?php foreach ($results as $i => $r):
@@ -171,23 +227,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <?php elseif ($topic_id > 0 && !empty($questions)): ?>
 
     <div style="max-width:750px;margin:0 auto;">
+
+        <?php if ($mode === 'retry'): ?>
+        <div style="background:#fdecea;border:1px solid #f5b7b1;border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:1.5rem;">❌</span>
+            <div>
+                <strong style="color:#c0392b;">Retry Mode</strong>
+                <p style="font-size:13px;color:#888;margin:0;">These are questions you previously got wrong. Get them right to clear them!</p>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
             <div>
                 <h2 style="font-size:22px;"><?= $topic['icon'] ?> <?= htmlspecialchars($topic['name']) ?></h2>
-                <p style="color:#888;font-size:14px;">10 questions — answer all then click Submit</p>
+                <p style="color:#888;font-size:14px;">5 questions · 15 minutes · Answer all then click Submit</p>
             </div>
-            <span id="answeredBadge" style="background:#eaf4ff;color:#2471a3;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;">
-                0/10 answered
-            </span>
+            <div style="display:flex;gap:10px;align-items:center;">
+                <!-- 15-minute timer -->
+                <div id="timerBadge" style="background:#2c3e50;color:white;padding:8px 16px;border-radius:20px;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;">
+                    ⏱️ <span id="timerDisplay">15:00</span>
+                </div>
+                <span id="answeredBadge" style="background:#eaf4ff;color:#2471a3;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;">
+                    0/5 answered
+                </span>
+            </div>
         </div>
 
         <form method="POST" id="quizForm">
             <input type="hidden" name="topic_id" value="<?= $topic_id ?>">
+            <input type="hidden" name="time_taken" id="timeTaken" value="0">
 
             <?php foreach ($questions as $i => $q): ?>
             <div class="card" style="margin-bottom:16px;border-left:4px solid #e0e0e0;transition:border-color .2s;" id="card-<?= $q['id'] ?>">
                 <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
-                    <span style="font-size:12px;font-weight:700;text-transform:uppercase;color:#999;">Question <?= $i+1 ?> of 10</span>
+                    <span style="font-size:12px;font-weight:700;text-transform:uppercase;color:#999;">Question <?= $i+1 ?> of 5</span>
                 </div>
 
                 <?php if (!empty($q['image_path'])): ?>
@@ -225,7 +299,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <button type="submit" class="btn btn-primary btn-lg" onclick="return confirmSubmit()">
                     Submit Quiz
                 </button>
-                <p style="color:#999;font-size:13px;margin-top:10px;">Make sure you answered all 10 questions</p>
+                <p style="color:#999;font-size:13px;margin-top:10px;">Quiz auto-submits when time runs out</p>
             </div>
         </form>
     </div>
@@ -234,17 +308,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <h2 style="font-size:18px;font-weight:700;margin-bottom:20px;">Choose a topic:</h2>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;">
-        <?php foreach ($topics as $topic): ?>
-        <a href="/testmate/quiz.php?topic=<?= $topic['id'] ?>" style="text-decoration:none;">
-            <div class="card" style="padding:28px;transition:transform .2s;cursor:pointer;"
-                 onmouseover="this.style.transform='translateY(-4px)'"
-                 onmouseout="this.style.transform='translateY(0)'">
-                <div style="font-size:2.5rem;margin-bottom:12px;"><?= $topic['icon'] ?></div>
-                <h3 style="font-size:17px;margin-bottom:6px;"><?= htmlspecialchars($topic['name']) ?></h3>
-                <p style="color:#888;font-size:13px;margin-bottom:16px;"><?= htmlspecialchars($topic['description']) ?></p>
-                <span class="btn btn-primary" style="font-size:14px;padding:8px 18px;">Start Quiz →</span>
+        <?php foreach ($topics as $tp):
+            // Count failed questions per topic for this user
+            $fq = $conn->prepare("SELECT COUNT(*) AS cnt FROM failed_questions WHERE user_id = ? AND topic_id = ?");
+            $fq->bind_param("ii", $user_id, $tp['id']);
+            $fq->execute();
+            $fc = $fq->get_result()->fetch_assoc()['cnt'];
+        ?>
+        <div class="card" style="padding:28px;transition:transform .2s;"
+             onmouseover="this.style.transform='translateY(-4px)'"
+             onmouseout="this.style.transform='translateY(0)'">
+            <div style="font-size:2.5rem;margin-bottom:12px;"><?= $tp['icon'] ?></div>
+            <h3 style="font-size:17px;margin-bottom:6px;"><?= htmlspecialchars($tp['name']) ?></h3>
+            <p style="color:#888;font-size:13px;margin-bottom:16px;"><?= htmlspecialchars($tp['description']) ?></p>
+
+            <?php if ($fc > 0): ?>
+            <div style="background:#fdecea;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:13px;color:#c0392b;">
+                ❌ <?= $fc ?> failed question<?= $fc > 1 ? 's' : '' ?> to retry
             </div>
-        </a>
+            <?php endif; ?>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <a href="/testmate/quiz.php?topic=<?= $tp['id'] ?>" class="btn btn-primary" style="font-size:14px;padding:8px 18px;">Start Quiz →</a>
+                <?php if ($fc > 0): ?>
+                <a href="/testmate/quiz.php?topic=<?= $tp['id'] ?>&mode=retry" class="btn btn-outline" style="font-size:14px;padding:8px 18px;border-color:#e74c3c;color:#e74c3c;">❌ Retry</a>
+                <?php endif; ?>
+            </div>
+        </div>
         <?php endforeach; ?>
     </div>
 
@@ -252,14 +342,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 </div>
 
+<!-- Floating counter -->
 <?php if ($topic_id > 0 && !empty($questions) && !isset($_GET['results'])): ?>
 <div style="position:fixed;bottom:24px;right:24px;background:#2c3e50;color:white;padding:14px 18px;border-radius:12px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.2);z-index:99;">
     <span style="font-size:24px;font-weight:800;color:#2ecc71;display:block;" id="floatCount">0</span>
-    <span style="font-size:12px;opacity:.7;">of 10 answered</span>
+    <span style="font-size:12px;opacity:.7;">of 5 answered</span>
 </div>
 <?php endif; ?>
 
 <script>
+// 15-minute timer
+const TOTAL = 15 * 60;
+let secondsLeft = TOTAL;
+const startTime = Date.now();
+
+function tick() {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    secondsLeft   = Math.max(0, TOTAL - elapsed);
+    const m = Math.floor(secondsLeft / 60);
+    const s = secondsLeft % 60;
+    const display = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    const el = document.getElementById('timerDisplay');
+    if (el) el.textContent = display;
+
+    const badge = document.getElementById('timerBadge');
+    if (badge) {
+        if (secondsLeft <= 60) badge.style.background = '#e74c3c';
+        else if (secondsLeft <= 300) badge.style.background = '#e67e22';
+    }
+
+    const ti = document.getElementById('timeTaken');
+    if (ti) ti.value = TOTAL - secondsLeft;
+
+    if (secondsLeft <= 0) {
+        const f = document.getElementById('quizForm');
+        if (f) f.submit();
+        return;
+    }
+}
+
+if (document.getElementById('timerDisplay')) {
+    setInterval(tick, 500);
+    tick();
+}
+
 const answered = new Set();
 function markAnswered(qid) {
     answered.add(qid);
@@ -267,12 +393,13 @@ function markAnswered(qid) {
     const fc = document.getElementById('floatCount');
     if (fc) fc.textContent = n;
     const ab = document.getElementById('answeredBadge');
-    if (ab) ab.textContent = n + '/10 answered';
+    if (ab) ab.textContent = n + '/5 answered';
     const card = document.getElementById('card-' + qid);
     if (card) card.style.borderLeftColor = '#27ae60';
 }
+
 function confirmSubmit() {
-    const left = 10 - answered.size;
+    const left = 5 - answered.size;
     if (left > 0) return confirm(left + ' question(s) unanswered.\nUnanswered will be marked wrong.\n\nSubmit anyway?');
     return true;
 }

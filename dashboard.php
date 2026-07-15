@@ -199,7 +199,7 @@ $mock_stats = $total_mocks->get_result()->fetch_assoc();
             <div style="font-size:2rem;margin-bottom:8px;">⏱️</div>
             <div style="font-weight:600;color:#2c3e50;">Mock Test</div>
             <div style="font-size:13px;color:#888;margin-top:4px;">Full timed test</div>
-        </a>
+        </a> 
     </div>
 
 </div>
