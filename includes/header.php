@@ -48,6 +48,7 @@ if (session_status() === PHP_SESSION_NONE) session_start();
     </a>
     <div class="nav-links">
         <?php if (isset($_SESSION['user_id'])): ?>
+            <a href="/testmate/activities.php">Activities</a>
             <a href="/testmate/study-materials.php">Study</a>
             <a href="/testmate/quiz.php">Quizzes</a>
             <a href="/testmate/mock-test.php">Mock Test</a>
