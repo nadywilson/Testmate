@@ -11,26 +11,35 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 </head>
 <body>
 
-<!-- Back/Forward Navigation Bar -->
-<div style="background:#f0f4f8;border-bottom:1px solid #e0e0e0;padding:6px 20px;display:flex;align-items:center;gap:8px;">
-    <button onclick="history.back()"
-        style="background:white;border:1px solid #ccc;border-radius:6px;padding:5px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:5px;color:#333;transition:all .2s;"
-        onmouseover="this.style.background='#e8e8e8'" onmouseout="this.style.background='white'">
-        ← Back
-    </button>
-    <button onclick="history.forward()"
-        style="background:white;border:1px solid #ccc;border-radius:6px;padding:5px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:5px;color:#333;transition:all .2s;"
-        onmouseover="this.style.background='#e8e8e8'" onmouseout="this.style.background='white'">
-        Forward →
-    </button>
-    <span style="font-size:12px;color:#999;margin-left:4px;">
-        <?php
-        $page = basename($_SERVER['PHP_SELF'], '.php');
-        $page = str_replace(['-','_'], ' ', $page);
-        echo ucwords($page);
-        ?>
-    </span>
-</div>
+<!-- Back Button - Bottom Left -->
+<button onclick="history.back()"
+    title="Go Back"
+    style="position:fixed;bottom:24px;left:24px;z-index:999;
+           width:44px;height:44px;border-radius:50%;
+           background:#2c3e50;color:white;border:none;
+           font-size:20px;cursor:pointer;
+           box-shadow:0 4px 12px rgba(0,0,0,0.2);
+           display:flex;align-items:center;justify-content:center;
+           transition:all 0.2s;"
+    onmouseover="this.style.background='#3498db';this.style.transform='scale(1.1)'"
+    onmouseout="this.style.background='#2c3e50';this.style.transform='scale(1)'">
+    &#8592;
+</button>
+
+<!-- Forward Button - Top Right -->
+<button onclick="history.forward()"
+    title="Go Forward"
+    style="position:fixed;top:80px;right:24px;z-index:999;
+           width:44px;height:44px;border-radius:50%;
+           background:#2c3e50;color:white;border:none;
+           font-size:20px;cursor:pointer;
+           box-shadow:0 4px 12px rgba(0,0,0,0.2);
+           display:flex;align-items:center;justify-content:center;
+           transition:all 0.2s;"
+    onmouseover="this.style.background='#3498db';this.style.transform='scale(1.1)'"
+    onmouseout="this.style.background='#2c3e50';this.style.transform='scale(1)'">
+    &#8594;
+</button>
 
 <!-- Main Navbar -->
 <nav class="navbar">
@@ -43,6 +52,8 @@ if (session_status() === PHP_SESSION_NONE) session_start();
             <a href="/testmate/quiz.php">Quizzes</a>
             <a href="/testmate/mock-test.php">Mock Test</a>
             <a href="/testmate/progress.php">Progress</a>
+            <a href="/testmate/leaderboard.php">Leaderboard</a>
+            <a href="/testmate/profile.php">Profile</a>
             <a href="/testmate/logout.php" class="btn-logout">
                 Logout (<?= htmlspecialchars($_SESSION['name'] ?? 'User') ?>)
             </a>

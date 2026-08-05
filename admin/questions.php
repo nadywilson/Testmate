@@ -5,7 +5,6 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     header("Location: /testmate/login.php"); exit();
 }
 
-// Handle delete
 if (isset($_GET['delete'])) {
     $del = $conn->prepare("DELETE FROM questions WHERE id = ?");
     $del->bind_param("i", $_GET['delete']);
@@ -17,12 +16,12 @@ if (isset($_GET['delete'])) {
 $topic_filter = isset($_GET['topic']) ? (int)$_GET['topic'] : 0;
 
 if ($topic_filter > 0) {
-    $q = $conn->prepare("SELECT q.*, t.name AS topic_name, t.icon FROM questions q JOIN topics t ON q.topic_id = t.id WHERE q.topic_id = ? ORDER BY q.id DESC");
+    $q = $conn->prepare("SELECT q.*, t.name AS topic_name FROM questions q JOIN topics t ON q.topic_id = t.id WHERE q.topic_id = ? ORDER BY q.id DESC");
     $q->bind_param("i", $topic_filter);
     $q->execute();
     $questions = $q->get_result()->fetch_all(MYSQLI_ASSOC);
 } else {
-    $questions = $conn->query("SELECT q.*, t.name AS topic_name, t.icon FROM questions q JOIN topics t ON q.topic_id = t.id ORDER BY q.id DESC")->fetch_all(MYSQLI_ASSOC);
+    $questions = $conn->query("SELECT q.*, t.name AS topic_name FROM questions q JOIN topics t ON q.topic_id = t.id ORDER BY q.id DESC")->fetch_all(MYSQLI_ASSOC);
 }
 
 $topics = $conn->query("SELECT * FROM topics ORDER BY id")->fetch_all(MYSQLI_ASSOC);
@@ -47,37 +46,38 @@ $topics = $conn->query("SELECT * FROM topics ORDER BY id")->fetch_all(MYSQLI_ASS
 <nav class="navbar">
     <a href="/testmate/admin/index.php" class="brand"><span class="brand-icon">T</span> TestMate Admin</a>
     <div class="nav-links">
-        <a href="/testmate/index.php" style="color:rgba(255,255,255,.8);font-size:14px;">← View Site</a>
+        <a href="/testmate/index.php" style="color:rgba(255,255,255,.8);font-size:14px;">View Site</a>
         <a href="/testmate/logout.php" class="btn-logout">Logout</a>
     </div>
 </nav>
 <div class="admin-wrap">
     <div class="sidebar">
         <h3>Main</h3>
-        <a href="/testmate/admin/index.php">📊 Dashboard</a>
-        <a href="/testmate/admin/users.php">👥 Users</a>
-        <a href="/testmate/admin/stats.php">📈 Statistics</a>
+        <a href="/testmate/admin/index.php">Dashboard</a>
+        <a href="/testmate/admin/users.php">Users</a>
+        <a href="/testmate/admin/stats.php">Statistics</a>
         <h3>Questions</h3>
-        <a href="/testmate/admin/questions.php" class="active">❓ All Questions</a>
-        <a href="/testmate/admin/add-question.php">➕ Add Question</a>
+        <a href="/testmate/admin/questions.php" class="active">All Questions</a>
+        <a href="/testmate/admin/add-question.php">Add Question</a>
+        <a href="/testmate/admin/assign-quiz.php">Assign Quiz</a>
         <h3>Content</h3>
-        <a href="/testmate/admin/materials.php">📚 Materials</a>
+        <a href="/testmate/admin/materials.php">Materials</a>
+        <a href="/testmate/admin/add-material.php">Add Material</a>
     </div>
     <div class="main-content">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
-            <h1 style="font-size:22px;">❓ Questions (<?= count($questions) ?>)</h1>
+            <h1 style="font-size:22px;">All Questions (<?= count($questions) ?>)</h1>
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-                <!-- Topic filter -->
                 <select onchange="location='questions.php?topic='+this.value"
                     style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;">
                     <option value="0">All Topics</option>
                     <?php foreach ($topics as $t): ?>
                     <option value="<?= $t['id'] ?>" <?= $topic_filter == $t['id'] ? 'selected' : '' ?>>
-                        <?= $t['icon'] ?> <?= htmlspecialchars($t['name']) ?>
+                        <?= htmlspecialchars($t['name']) ?>
                     </option>
                     <?php endforeach; ?>
                 </select>
-                <a href="/testmate/admin/add-question.php" class="btn btn-primary" style="font-size:14px;padding:8px 16px;">➕ Add Question</a>
+                <a href="/testmate/admin/add-question.php" class="btn btn-primary" style="font-size:14px;padding:8px 16px;">Add Question</a>
             </div>
         </div>
 
@@ -90,16 +90,17 @@ $topics = $conn->query("SELECT * FROM topics ORDER BY id")->fetch_all(MYSQLI_ASS
         <div class="table-wrap">
             <table>
                 <thead>
-                    <tr><th>#</th><th>Topic</th><th>Question</th><th>Answer</th><th>Actions</th></tr>
+                    <tr><th>#</th><th>Topic</th><th>Question</th><th>Answer</th><th>Image</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                 <?php foreach ($questions as $q): ?>
                 <tr>
                     <td style="color:#888;font-size:13px;"><?= $q['id'] ?></td>
-                    <td><span style="font-size:13px;"><?= $q['icon'] ?> <?= htmlspecialchars($q['topic_name']) ?></span></td>
+                    <td style="font-size:13px;"><?= htmlspecialchars($q['topic_name']) ?></td>
                     <td style="font-size:14px;max-width:300px;"><?= htmlspecialchars(substr($q['question'], 0, 80)) ?>...</td>
                     <td><span class="badge" style="background:#eaf4ff;color:#2471a3;font-size:13px;"><?= $q['correct_answer'] ?></span></td>
-                    <td>
+                    <td><?= $q['image_path'] ? '<span style="color:#27ae60;font-size:13px;">Yes</span>' : '<span style="color:#ccc;font-size:13px;">No</span>' ?></td>
+                    <td style="white-space:nowrap;">
                         <a href="/testmate/admin/add-question.php?edit=<?= $q['id'] ?>" style="color:#3498db;font-size:13px;text-decoration:none;margin-right:10px;">Edit</a>
                         <a href="/testmate/admin/questions.php?delete=<?= $q['id'] ?>"
                            onclick="return confirm('Delete this question?')"
