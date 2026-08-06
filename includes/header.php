@@ -46,22 +46,23 @@ if (session_status() === PHP_SESSION_NONE) session_start();
     <a href="/testmate/index.php" class="brand">
         <span class="brand-icon">T</span> TestMate
     </a>
-    <div class="nav-links">
-        <?php if (isset($_SESSION['user_id'])): ?>
-            <a href="/testmate/activities.php">Activities</a>
-            <a href="/testmate/study-materials.php">Study</a>
-            <a href="/testmate/quiz.php">Quizzes</a>
-            <a href="/testmate/mock-test.php">Mock Test</a>
-            <a href="/testmate/progress.php">Progress</a>
-            <a href="/testmate/leaderboard.php">Leaderboard</a>
-            <a href="/testmate/profile.php">Profile</a>
-            <a href="/testmate/logout.php" class="btn-logout">
-                Logout (<?= htmlspecialchars($_SESSION['name'] ?? 'User') ?>)
-            </a>
-        <?php else: ?>
-            <a href="/testmate/study-materials.php">Browse</a>
-            <a href="/testmate/login.php">Login</a>
-            <a href="/testmate/register.php" class="btn-nav-primary">Register Free</a>
-        <?php endif; ?>
+    <<div class="nav-links">
+    <?php if (isset($_SESSION['user_id'])): ?>
+        <a href="/testmate/study-materials.php">Study</a>
+        <a href="/testmate/simulations.php">Simulations</a>
+        <a href="/testmate/quiz.php">Quizzes</a>
+        <a href="/testmate/mock-test.php">Mock Test</a>
+        <a href="/testmate/progress.php">Progress</a>
+        <a href="/testmate/leaderboard.php">Leaderboard</a>
+        <a href="/testmate/profile.php">Profile</a>
+        <a href="/testmate/logout.php" class="btn-logout">
+            Logout (<?= htmlspecialchars($_SESSION['name'] ?? 'User') ?>)
+        </a>
+    <?php else: ?>
+        <a href="/testmate/study-materials.php">Browse</a>
+        <a href="/testmate/login.php">Login</a>
+        <a href="/testmate/register.php" class="btn-nav-primary">Register Free</a>
+    <?php endif; ?>
+</div>
     </div>
 </nav>

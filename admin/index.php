@@ -71,6 +71,7 @@ $topic_stats = $conn->query("
         <a href="/testmate/admin/add-question.php">Add Question</a>
         <a href="/testmate/admin/assign-quiz.php">Assign Quiz</a>
         <h3>Content</h3>
+        <a href="/testmate/admin/simulations.php">Simulations</a>
         <a href="/testmate/admin/activities.php">Activities</a>
         <a href="/testmate/admin/materials.php">Materials</a>
         <a href="/testmate/admin/add-material.php">Add Material</a>

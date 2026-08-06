@@ -165,17 +165,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <!-- Action Buttons -->
-    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px;">
-        <a href="/testmate/quiz.php?topic=<?= $tid ?>" class="btn btn-primary">🔄 New Quiz</a>
-        <?php if ($failed_count > 0): ?>
-        <a href="/testmate/quiz.php?topic=<?= $tid ?>&mode=retry" class="btn btn-outline" style="border-color:#e74c3c;color:#e74c3c;">
-            ❌ Retry <?= $failed_count ?> Failed Question<?= $failed_count > 1 ? 's' : '' ?>
+<!-- Action Buttons -->
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px;">
+    <a href="/testmate/quiz.php?topic=<?= $tid ?>" class="btn btn-primary">Try Again</a>
+    <?php if ($failed_count > 0): ?>
+    <a href="/testmate/quiz.php?topic=<?= $tid ?>&=retry" class="btn btn-outline" style="border-color:#e74c3c;color:#e74c3c;">
+        Retry Failed Questions
+    </a>
+    <?php endif; ?>
+    <a href="/testmate/quiz.php" class="btn btn-outline">All Topics</a>
+    <a href="/testmate/dashboard.php" class="btn btn-outline">Dashboard</a>
+</div>
+
+<!-- Study Direction Banner -->
+<?php if ($percentage < 80): ?>
+<div style="background:#fff8f0;border:1px solid #f5cba7;border-radius:12px;padding:20px 24px;margin-bottom:28px;">
+    <h3 style="color:#e67e22;font-size:16px;font-weight:700;margin-bottom:8px;">You scored below 80% — Here is what to study</h3>
+    <p style="color:#555;font-size:14px;margin-bottom:16px;line-height:1.6;">
+        Based on your results, we recommend going back to study the
+        <strong><?= htmlspecialchars($rtopic['name']) ?></strong> topic before trying again.
+        You can read the material or watch the animated video explanations.
+    </p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <a href="/testmate/study-materials.php?topic=<?= $tid ?>&ode=read"
+           class="btn btn-outline" style="font-size:14px;padding:8px 18px;">
+            Read <?= htmlspecialchars($rtopic['name']) ?>
         </a>
-        <?php endif; ?>
-        <a href="/testmate/quiz.php" class="btn btn-outline">📋 All Topics</a>
-        <a href="/testmate/study-materials.php?topic=<?= $tid ?>" class="btn btn-outline">📖 Study</a>
-        <a href="/testmate/dashboard.php" class="btn btn-outline">🏠 Dashboard</a>
+        <a href="/testmate/study-materials.php?topic=<?= $tid ?>&=video"
+           class="btn btn-primary" style="font-size:14px;padding:8px 18px;background:#e67e22;border:none;">
+            Watch Video Explanations
+        </a>
     </div>
+</div>
+<?php endif; ?>
 
     <!-- Answer Review -->
     <h2 style="font-size:18px;font-weight:700;margin-bottom:16px;">📋 Answer Review</h2>
@@ -217,11 +239,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <?php if ($r['explanation']): ?>
-        <div style="background:#f0f8ff;border-left:3px solid #3498db;padding:10px 14px;border-radius:0 6px 6px 0;font-size:13px;color:#555;">
-            💡 <?= htmlspecialchars($r['explanation']) ?>
-        </div>
-        <?php endif; ?>
-    </div>
+<div style="background:#f0f8ff;border-left:3px solid #3498db;padding:10px 14px;border-radius:0 6px 6px 0;font-size:13px;color:#555;">
+    <?= htmlspecialchars($r['explanation']) ?>
+</div>
+<?php endif; ?>
+<?php if (!$r['is_correct']): ?>
+<div style="margin-top:8px;font-size:13px;color:#888;">
+    Need help with this?
+    <a href="/testmate/study-materials.php?topic=<?= $tid ?>&mode=read" style="color:#3498db;font-weight:600;">Read the <?= htmlspecialchars($rtopic['name']) ?> notes</a>
+    or
+    <a href="/testmate/study-materials.php?topic=<?= $tid ?>&mode=video" style="color:#e67e22;font-weight:600;">Watch the video</a>
+</div>
+<?php endif; ?>ssss
     <?php endforeach; ?>
 
 <?php elseif ($topic_id > 0 && !empty($questions)): ?>
