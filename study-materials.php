@@ -370,6 +370,15 @@ if (isset($_GET['topic'])) {
                         ['car_yields'=>false, 'oncoming'=>true,  'is_correct'=>false, 'label'=>'Driver does not yield', 'explanation'=>'Incorrect! You must always give way at a YIELD sign when other vehicles are approaching on the main road.'],
                     ]
                 ],
+                [
+                    'title'       => 'Speed Limit Signs',
+                    'description' => 'See how a regulatory speed sign sets the maximum speed you may legally travel.',
+                    'type'        => 'speed',
+                    'scenarios'   => [
+                        ['limit'=>60, 'speed'=>60, 'is_correct'=>true,  'explanation'=>'Correct! The driver is travelling at exactly the 60 km/h shown on the regulatory speed sign.'],
+                        ['limit'=>60, 'speed'=>90, 'is_correct'=>false, 'explanation'=>'Incorrect! The sign shows a 60 km/h limit. Travelling at 90 km/h ignores the regulatory sign and is illegal.'],
+                    ]
+                ],
             ],
             2 => [ // Traffic Rules
                 [
@@ -396,6 +405,15 @@ if (isset($_GET['topic'])) {
                         ['order'=>'left',   'goes'=>true,  'is_correct'=>false, 'explanation'=>'Incorrect! When two vehicles arrive simultaneously, the vehicle on the LEFT must give way to the vehicle on the RIGHT.'],
                     ]
                 ],
+                [
+                    'title'       => 'Cell Phones & Distracted Driving',
+                    'description' => 'See why using a hand-held phone while driving breaks the rules of the road.',
+                    'type'        => 'vehicle_check',
+                    'scenarios'   => [
+                        ['action'=>'phone_in_hand',    'label'=>'Phone: In hand',           'is_correct'=>false, 'explanation'=>'Incorrect! Holding a phone while driving is illegal, even at a red light. You may only use a hands-free device.'],
+                        ['action'=>'phone_hands_free', 'label'=>'Phone: Hands-free device',  'is_correct'=>true,  'explanation'=>'Correct! Using a hands-free device keeps both hands on the wheel and complies with the law.'],
+                    ]
+                ],
             ],
             3 => [ // Speed Limits
                 [
@@ -405,34 +423,84 @@ if (isset($_GET['topic'])) {
                     'scenarios'   => [
                         ['limit'=>60, 'speed'=>60, 'is_correct'=>true,  'explanation'=>'Correct! The driver is travelling at 60 km/h which is the correct speed limit in a town or city.'],
                         ['limit'=>60, 'speed'=>80, 'is_correct'=>false, 'explanation'=>'Incorrect! The speed limit in a town is 60 km/h. Driving at 80 km/h is speeding and is illegal and dangerous.'],
+                    ]
+                ],
+                [
+                    'title'       => 'Speed Limits on the Open Road',
+                    'description' => 'Learn the correct speed limit for tarred open roads outside town.',
+                    'type'        => 'speed',
+                    'scenarios'   => [
                         ['limit'=>120,'speed'=>120,'is_correct'=>true,  'explanation'=>'Correct! On an open tarred road the speed limit is 120 km/h. The driver is complying with the limit.'],
                         ['limit'=>120,'speed'=>140,'is_correct'=>false, 'explanation'=>'Incorrect! The speed limit on open tarred roads is 120 km/h. Driving at 140 km/h is speeding.'],
+                    ]
+                ],
+                [
+                    'title'       => 'Learner Driver Speed Limit',
+                    'description' => 'A learner driver must never exceed 80 km/h, even where the posted limit is higher.',
+                    'type'        => 'speed',
+                    'scenarios'   => [
+                        ['limit'=>80, 'speed'=>80,  'is_correct'=>true,  'explanation'=>'Correct! A learner driver must never exceed 80 km/h, regardless of the posted speed limit.'],
+                        ['limit'=>80, 'speed'=>100, 'is_correct'=>false, 'explanation'=>'Incorrect! Even though the road may allow a higher speed, a learner driver may never exceed 80 km/h.'],
                     ]
                 ],
             ],
             4 => [ // Parking Rules
                 [
-                    'title'       => 'Where to Park',
-                    'description' => 'Watch different parking scenarios and learn which are legal.',
+                    'title'       => 'Legal vs Illegal Parking Bays',
+                    'description' => 'Compare parking in a proper bay against parking on the pavement.',
                     'type'        => 'parking',
                     'scenarios'   => [
                         ['location'=>'legal',    'is_correct'=>true,  'explanation'=>'Correct! The driver parked in a legal parking bay away from intersections and crossings.'],
                         ['location'=>'pavement', 'is_correct'=>false, 'explanation'=>'Incorrect! Parking on a pavement is illegal. It forces pedestrians into the road and is dangerous.'],
+                    ]
+                ],
+                [
+                    'title'       => 'No-Stopping Zones — Yellow Kerbs & Crossings',
+                    'description' => 'Learn where stopping or parking is never allowed, no matter how briefly.',
+                    'type'        => 'parking',
+                    'scenarios'   => [
                         ['location'=>'yellow',   'is_correct'=>false, 'explanation'=>'Incorrect! A yellow kerb means no parking or stopping at any time.'],
                         ['location'=>'crossing', 'is_correct'=>false, 'explanation'=>'Incorrect! You must not park within 6 metres of a pedestrian crossing.'],
+                    ]
+                ],
+                [
+                    'title'       => 'Parking Near Intersections, Driveways & Hydrants',
+                    'description' => 'These spots are illegal to park in even when there is no sign telling you so.',
+                    'type'        => 'parking',
+                    'scenarios'   => [
+                        ['location'=>'intersection', 'is_correct'=>false, 'explanation'=>'Incorrect! You may not park within 9 metres of an intersection.'],
+                        ['location'=>'driveway',     'is_correct'=>false, 'explanation'=>'Incorrect! Parking in front of a private driveway blocks access and is illegal.'],
+                        ['location'=>'hydrant',      'is_correct'=>false, 'explanation'=>'Incorrect! You must not park within 3 metres of a fire hydrant.'],
                     ]
                 ],
             ],
             5 => [ // Vehicle Controls
                 [
-                    'title'       => 'Pre-Drive Safety Checks',
+                    'title'       => 'Seatbelt & Mirror Checks',
                     'description' => 'See the correct procedure before starting your vehicle.',
                     'type'        => 'vehicle_check',
                     'scenarios'   => [
-                        ['action'=>'seatbelt_on',  'is_correct'=>true,  'explanation'=>'Correct! Always fasten your seatbelt before starting the engine. It is the law and could save your life.'],
-                        ['action'=>'seatbelt_off', 'is_correct'=>false, 'explanation'=>'Incorrect! Never drive without a seatbelt. It is both illegal and extremely dangerous.'],
-                        ['action'=>'mirrors_set',  'is_correct'=>true,  'explanation'=>'Correct! Always adjust your mirrors before driving to ensure maximum visibility around your vehicle.'],
-                        ['action'=>'phone_in_hand','is_correct'=>false, 'explanation'=>'Incorrect! Never hold a phone while driving. It is illegal and significantly increases your risk of an accident.'],
+                        ['action'=>'seatbelt_on',  'label'=>'Seatbelt: ON',        'is_correct'=>true,  'explanation'=>'Correct! Always fasten your seatbelt before starting the engine. It is the law and could save your life.'],
+                        ['action'=>'seatbelt_off', 'label'=>'Seatbelt: OFF',       'is_correct'=>false, 'explanation'=>'Incorrect! Never drive without a seatbelt. It is both illegal and extremely dangerous.'],
+                        ['action'=>'mirrors_set',  'label'=>'Mirrors: Adjusted',   'is_correct'=>true,  'explanation'=>'Correct! Always adjust your mirrors before driving to ensure maximum visibility around your vehicle.'],
+                    ]
+                ],
+                [
+                    'title'       => 'Hands-Free vs Hand-Held',
+                    'description' => 'Test your knowledge on using a phone behind the wheel.',
+                    'type'        => 'vehicle_check',
+                    'scenarios'   => [
+                        ['action'=>'phone_in_hand',    'label'=>'Phone: In hand',          'is_correct'=>false, 'explanation'=>'Incorrect! Never hold a phone while driving. It is illegal and significantly increases your risk of an accident.'],
+                        ['action'=>'phone_hands_free', 'label'=>'Phone: Hands-free',        'is_correct'=>true,  'explanation'=>'Correct! A hands-free device lets you keep both hands on the wheel and stay within the law.'],
+                    ]
+                ],
+                [
+                    'title'       => 'Dashboard Warning Lights',
+                    'description' => 'Learn how to respond correctly when a warning light appears on your dashboard.',
+                    'type'        => 'vehicle_check',
+                    'scenarios'   => [
+                        ['action'=>'oil_light_stop',     'label'=>'Oil Light: RED — Driver stops immediately', 'is_correct'=>true,  'explanation'=>'Correct! A red oil warning light means oil pressure is critically low. Stop immediately to avoid engine damage.'],
+                        ['action'=>'oil_light_continue', 'label'=>'Oil Light: RED — Driver keeps driving',     'is_correct'=>false, 'explanation'=>'Incorrect! Ignoring a red oil warning light can cause severe engine damage. You must stop immediately.'],
                     ]
                 ],
             ],
@@ -468,6 +536,10 @@ if (isset($_GET['topic'])) {
                             — <?= ucfirst($sc['light']) ?> light
                         <?php elseif (isset($sc['car_stops'])): ?>
                             — <?= $sc['car_stops'] ? 'Driver stops' : 'Driver does not stop' ?>
+                        <?php elseif (isset($sc['car_yields'])): ?>
+                            — <?= $sc['car_yields'] ? 'Driver yields' : 'Driver does not yield' ?>
+                        <?php elseif (isset($sc['order'])): ?>
+                            — Arrives <?= ucfirst($sc['order']) ?>, <?= $sc['goes'] ? 'proceeds' : 'waits' ?>
                         <?php elseif (isset($sc['speed'])): ?>
                             — Driving at <?= $sc['speed'] ?> km/h (limit: <?= $sc['limit'] ?> km/h)
                         <?php elseif (isset($sc['location'])): ?>
@@ -547,11 +619,7 @@ if (isset($_GET['topic'])) {
                             <?php elseif ($sg['type'] === 'vehicle_check'): ?>
                             <!-- Vehicle interior indicator -->
                             <div style="position:absolute;top:15%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:white;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:15;text-align:center;white-space:nowrap;">
-                                <?php if ($sc['action'] === 'seatbelt_on'): ?>Seatbelt: ON
-                                <?php elseif ($sc['action'] === 'seatbelt_off'): ?>Seatbelt: OFF
-                                <?php elseif ($sc['action'] === 'mirrors_set'): ?>Mirrors: Adjusted
-                                <?php else: ?>Phone: In hand
-                                <?php endif; ?>
+                                <?= htmlspecialchars($sc['label'] ?? ucfirst(str_replace('_',' ',$sc['action']))) ?>
                             </div>
                             <?php endif; ?>
 
@@ -568,7 +636,10 @@ if (isset($_GET['topic'])) {
                         <div class="sim-controls">
                             <span class="sim-status" id="status-<?= $uid ?>">Click Play to watch the scenario</span>
                             <button class="play-btn" id="playbtn-<?= $uid ?>"
-                                    onclick="playScenario('<?= $uid ?>', <?= json_encode($sc) ?>, '<?= $sg['type'] ?>')">
+                                    data-uid="<?= htmlspecialchars($uid) ?>"
+                                    data-type="<?= htmlspecialchars($sg['type']) ?>"
+                                    data-scenario='<?= htmlspecialchars(json_encode($sc), ENT_QUOTES, "UTF-8") ?>'
+                                    onclick="playScenario(this)">
                                 Play
                             </button>
                         </div>
@@ -629,12 +700,15 @@ if (isset($_GET['topic'])) {
 </div>
 
 <script>
-function playScenario(uid, scenario, type) {
+function playScenario(btn) {
+    const uid      = btn.dataset.uid;
+    const type     = btn.dataset.type;
+    const scenario = JSON.parse(btn.dataset.scenario);
+
     const car    = document.getElementById('car-' + uid);
     const result = document.getElementById('result-' + uid);
     const status = document.getElementById('status-' + uid);
     const expl   = document.getElementById('expl-' + uid);
-    const btn    = document.getElementById('playbtn-' + uid);
     const speedo = document.getElementById('speedo-' + uid);
 
     if (!car) return;

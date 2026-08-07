@@ -88,6 +88,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_simulation']))
                     <span style="font-size:13px;color:#666;"><?= $scenario['car_passes']?'drives through':'stops' ?></span>
                     <span style="font-size:20px;"><?= $scenario['is_correct']?'✅':'❌' ?></span>
                 </div>
+                <?php elseif ($scenario): ?>
+                <div style="display:inline-flex;align-items:center;gap:14px;font-size:14px;color:#555;">
+                    <span style="font-size:24px;">🚗</span>
+                    <span>
+                        <?php if (isset($scenario['location'])): ?>
+                            Parked: <?= htmlspecialchars(ucfirst(str_replace('_',' ',$scenario['location']))) ?>
+                        <?php elseif (isset($scenario['speed'])): ?>
+                            Speed: <?= (int)$scenario['speed'] ?> km/h (limit <?= (int)$scenario['limit'] ?> km/h)
+                        <?php elseif (isset($scenario['arriving_order'])): ?>
+                            Arrived <?= htmlspecialchars($scenario['arriving_order']) ?> — <?= htmlspecialchars($scenario['action']) ?>
+                        <?php elseif (isset($scenario['label'])): ?>
+                            <?= htmlspecialchars($scenario['label']) ?>
+                        <?php else: ?>
+                            <?= htmlspecialchars(ucfirst($scenario['sign'] ?? '')) ?> sign
+                        <?php endif; ?>
+                    </span>
+                    <span style="font-size:20px;"><?= $scenario['is_correct']?'✅':'❌' ?></span>
+                </div>
                 <?php endif; ?>
             </div>
 
@@ -176,6 +194,21 @@ if (!$sim_id) {
                             <div style="background:rgba(255,255,255,.1);height:30px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:16px;">🚙</div>
                         </div>
                         <div style="color:white;font-size:13px;margin-top:10px;opacity:.9;">Four-Way Stop Intersection</div>
+                    </div>
+                    <?php elseif ($sim['animation_type'] === 'speed'): ?>
+                    <div style="text-align:center;">
+                        <div style="width:56px;height:56px;border-radius:50%;border:5px solid white;display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:18px;font-weight:900;color:white;">120</div>
+                        <div style="color:white;font-size:13px;margin-top:10px;opacity:.9;">Speed Limit Scenarios</div>
+                    </div>
+                    <?php elseif ($sim['animation_type'] === 'parking'): ?>
+                    <div style="text-align:center;">
+                        <div style="font-size:40px;margin-bottom:8px;">🅿️</div>
+                        <div style="color:white;font-size:13px;opacity:.9;">Parking Scenarios</div>
+                    </div>
+                    <?php elseif ($sim['animation_type'] === 'vehicle_check'): ?>
+                    <div style="text-align:center;">
+                        <div style="font-size:40px;margin-bottom:8px;">🚘</div>
+                        <div style="color:white;font-size:13px;opacity:.9;">Vehicle Control Scenarios</div>
                     </div>
                     <?php else: ?>
                     <div style="text-align:center;">
@@ -397,6 +430,37 @@ include 'includes/header.php';
 .answer-btn.correct  { border-color: #27ae60; background: #eafaf1; color: #27ae60; }
 .answer-btn.wrong    { border-color: #e74c3c; background: #fdecea; color: #e74c3c; }
 .answer-btn .btn-icon { font-size: 22px; }
+
+/* New animation types: speed / parking / vehicle_check */
+.speed-sign-pole {
+    position: absolute; right: 25%; bottom: 30%; z-index: 5; text-align: center;
+}
+.speed-sign-circle {
+    width: 54px; height: 54px; border-radius: 50%; border: 5px solid #e74c3c;
+    background: white; display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 4px; font-size: 15px; font-weight: 900; color: #333;
+}
+.speedo-badge {
+    position: absolute; top: 12%; left: 12%; background: rgba(0,0,0,.7); color: white;
+    padding: 6px 14px; border-radius: 8px; font-size: 14px; font-weight: 700; z-index: 15;
+}
+.parking-pole { position: absolute; right: 25%; bottom: 30%; z-index: 5; text-align: center; }
+.parking-legal-p {
+    width: 42px; height: 50px; background: #3498db; border-radius: 6px; display: flex;
+    align-items: center; justify-content: center; margin: 0 auto 4px; font-size: 22px;
+    font-weight: 900; color: white;
+}
+.parking-yellow-strip { position: absolute; bottom: 30%; left: 0; right: 0; height: 6px; background: #f1c40f; }
+.parking-no-p {
+    width: 42px; height: 42px; border-radius: 50%; border: 4px solid #e74c3c; background: white;
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 4px;
+    font-size: 17px; font-weight: 900; color: #e74c3c; text-decoration: line-through;
+}
+.vehicle-check-badge {
+    position: absolute; top: 15%; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,.75); color: white; padding: 10px 18px; border-radius: 10px;
+    font-size: 13px; font-weight: 600; z-index: 15; text-align: center; white-space: nowrap;
+}
 </style>
 
 <!-- Page Header -->
@@ -437,8 +501,14 @@ include 'includes/header.php';
                 <?= ucfirst($scenario['light']) ?> light — Car <?= $scenario['car_passes'] ? 'drives through' : 'stops' ?>
             <?php elseif ($simulation['animation_type'] === 'four_way_stop'): ?>
                 Vehicle arrives <?= str_replace('_',' ',$scenario['arriving_order']) ?> — Action: <?= $scenario['action'] ?>
-            <?php else: ?>
+            <?php elseif ($simulation['animation_type'] === 'road_signs'): ?>
                 <?= ucfirst($scenario['sign'] ?? '') ?> sign — Driver <?= ($scenario['driver_stops'] ?? false) ? 'stops' : 'does not stop' ?>
+            <?php elseif ($simulation['animation_type'] === 'speed'): ?>
+                Driving at <?= (int)($scenario['speed'] ?? 0) ?> km/h (limit: <?= (int)($scenario['limit'] ?? 0) ?> km/h)
+            <?php elseif ($simulation['animation_type'] === 'parking'): ?>
+                <?= ucfirst(str_replace('_',' ',$scenario['location'] ?? '')) ?> parking
+            <?php elseif ($simulation['animation_type'] === 'vehicle_check'): ?>
+                <?= htmlspecialchars($scenario['label'] ?? ucfirst(str_replace('_',' ',$scenario['action'] ?? ''))) ?>
             <?php endif; ?>
         </span>
     </h3>
@@ -484,6 +554,29 @@ include 'includes/header.php';
                 <div style="width:3px;height:30px;background:#666;margin:0 auto;"></div>
             </div>
             <?php endforeach; ?>
+            
+
+            <?php elseif ($simulation['animation_type'] === 'speed'): ?>
+            <div class="speed-sign-pole">
+                <div class="speed-sign-circle"><?= (int)($scenario['limit'] ?? 0) ?></div>
+                <div style="width:5px;height:55px;background:#777;border-radius:3px;margin:0 auto;"></div>
+            </div>
+            <div class="speedo-badge" id="speedo-study-<?= $si ?>" style="display:none;"><?= (int)($scenario['speed'] ?? 0) ?> km/h</div>
+
+            <?php elseif ($simulation['animation_type'] === 'parking'): ?>
+            <div class="parking-pole">
+                <?php if (($scenario['location'] ?? '') === 'legal'): ?>
+                <div class="parking-legal-p">P</div>
+                <?php elseif (($scenario['location'] ?? '') === 'yellow'): ?>
+                <div class="parking-yellow-strip"></div>
+                <div style="background:rgba(0,0,0,.6);color:white;padding:4px 8px;border-radius:6px;font-size:10px;font-weight:700;">YELLOW KERB</div>
+                <?php else: ?>
+                <div class="parking-no-p">P</div>
+                <?php endif; ?>
+            </div>
+
+            <?php elseif ($simulation['animation_type'] === 'vehicle_check'): ?>
+            <div class="vehicle-check-badge"><?= htmlspecialchars($scenario['label'] ?? ucfirst(str_replace('_',' ',$scenario['action'] ?? ''))) ?></div>
             <?php endif; ?>
 
             <!-- Car -->
@@ -499,7 +592,9 @@ include 'includes/header.php';
         <!-- Info bar -->
         <div class="sim-info">
             <span id="status-study-<?= $si ?>" style="font-size:13px;">Click Play to watch the scenario</span>
-            <button onclick="playStudyScenario(<?= $si ?>, <?= json_encode($scenario) ?>)"
+            <button data-si="<?= $si ?>"
+                    data-scenario='<?= htmlspecialchars(json_encode($scenario), ENT_QUOTES, "UTF-8") ?>'
+                    onclick="playStudyScenario(this)"
                     id="playBtn-study-<?= $si ?>"
                     style="background:#3498db;color:white;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">
                 Play
@@ -576,6 +671,34 @@ include 'includes/header.php';
                     <?php endif; ?>
                     <div class="stop-sign-pole"></div>
                 </div>
+                <?php elseif ($simulation['animation_type'] === 'four_way_stop' && $scenario): ?>
+                <?php foreach ([['right:15%','bottom:35%'],['right:15%','bottom:55%'],['left:15%','bottom:35%'],['left:15%','bottom:55%']] as $pos): ?>
+                <div style="position:absolute;<?= $pos[0] ?>;<?= $pos[1] ?>;text-align:center;">
+                    <div style="width:24px;height:24px;background:#e74c3c;clip-path:polygon(30% 0%,70% 0%,100% 30%,100% 70%,70% 100%,30% 100%,0% 70%,0% 30%);margin:0 auto;display:flex;align-items:center;justify-content:center;">
+                        <span style="color:white;font-size:5px;font-weight:800;">STOP</span>
+                    </div>
+                    <div style="width:3px;height:30px;background:#666;margin:0 auto;"></div>
+                </div>
+                <?php endforeach; ?>
+                <?php elseif ($simulation['animation_type'] === 'speed' && $scenario): ?>
+                <div class="speed-sign-pole">
+                    <div class="speed-sign-circle"><?= (int)($scenario['limit'] ?? 0) ?></div>
+                    <div style="width:5px;height:55px;background:#777;border-radius:3px;margin:0 auto;"></div>
+                </div>
+                <div class="speedo-badge" id="speedo-quiz-<?= $qi ?>" style="display:none;"><?= (int)($scenario['speed'] ?? 0) ?> km/h</div>
+                <?php elseif ($simulation['animation_type'] === 'parking' && $scenario): ?>
+                <div class="parking-pole">
+                    <?php if (($scenario['location'] ?? '') === 'legal'): ?>
+                    <div class="parking-legal-p">P</div>
+                    <?php elseif (($scenario['location'] ?? '') === 'yellow'): ?>
+                    <div class="parking-yellow-strip"></div>
+                    <div style="background:rgba(0,0,0,.6);color:white;padding:4px 8px;border-radius:6px;font-size:10px;font-weight:700;">YELLOW KERB</div>
+                    <?php else: ?>
+                    <div class="parking-no-p">P</div>
+                    <?php endif; ?>
+                </div>
+                <?php elseif ($simulation['animation_type'] === 'vehicle_check' && $scenario): ?>
+                <div class="vehicle-check-badge"><?= htmlspecialchars($scenario['label'] ?? ucfirst(str_replace('_',' ',$scenario['action'] ?? ''))) ?></div>
                 <?php endif; ?>
 
                 <div class="car" id="car-quiz-<?= $qi ?>" style="left:5%;bottom:28%;">🚗</div>
@@ -584,7 +707,10 @@ include 'includes/header.php';
             </div>
             <div class="sim-info">
                 <span id="qstatus-<?= $qi ?>" style="font-size:13px;">Click Play to watch — then decide if the action was correct</span>
-                <button type="button" onclick="playQuizScenario(<?= $qi ?>, <?= json_encode($scenario) ?>)"
+                <button type="button"
+                        data-qi="<?= $qi ?>"
+                        data-scenario='<?= htmlspecialchars(json_encode($scenario), ENT_QUOTES, "UTF-8") ?>'
+                        onclick="playQuizScenario(this)"
                         id="qplayBtn-<?= $qi ?>"
                         style="background:#e74c3c;color:white;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">
                     Play
@@ -635,12 +761,15 @@ include 'includes/header.php';
 
 <script>
 // ── STUDY MODE ANIMATIONS ──
-function playStudyScenario(si, scenario) {
+function playStudyScenario(btn) {
+    const si       = btn.dataset.si;
+    const scenario = JSON.parse(btn.dataset.scenario);
+
     const car    = document.getElementById('car-study-' + si);
     const result = document.getElementById('result-study-' + si);
     const status = document.getElementById('status-study-' + si);
     const expl   = document.getElementById('explanation-study-' + si);
-    const btn    = document.getElementById('playBtn-study-' + si);
+    const speedo = document.getElementById('speedo-study-' + si);
 
     if (!car) return;
 
@@ -648,13 +777,24 @@ function playStudyScenario(si, scenario) {
     btn.textContent = 'Playing...';
     result.classList.remove('show');
     expl.style.display = 'none';
+    if (speedo) speedo.style.display = 'none';
 
     status.textContent = 'Car approaching...';
     car.style.left = '5%';
 
     setTimeout(() => {
         status.textContent = 'Action happening...';
-        if (scenario.car_passes || scenario.driver_stops === false) {
+        if (speedo) speedo.style.display = 'block';
+
+        if ('location' in scenario) {
+            car.style.left = '55%';
+        } else if ('label' in scenario) {
+            car.style.left = '25%';
+        } else if ('speed' in scenario) {
+            car.style.left = '80%';
+        } else if ('arriving_order' in scenario) {
+            car.style.left = (scenario.action === 'go') ? '75%' : '40%';
+        } else if (scenario.car_passes || scenario.driver_stops === false) {
             car.style.left = '90%';
         } else {
             car.style.left = '40%';
@@ -671,10 +811,13 @@ function playStudyScenario(si, scenario) {
 }
 
 // ── QUIZ MODE ANIMATIONS (no result shown) ──
-function playQuizScenario(qi, scenario) {
+function playQuizScenario(btn) {
+    const qi       = btn.dataset.qi;
+    const scenario = JSON.parse(btn.dataset.scenario);
+
     const car    = document.getElementById('car-quiz-' + qi);
     const status = document.getElementById('qstatus-' + qi);
-    const btn    = document.getElementById('qplayBtn-' + qi);
+    const speedo = document.getElementById('speedo-quiz-' + qi);
 
     if (!car) return;
 
@@ -682,9 +825,24 @@ function playQuizScenario(qi, scenario) {
     btn.textContent = 'Playing...';
     car.style.left  = '5%';
     status.textContent = 'Watch carefully...';
+    if (speedo) speedo.style.display = 'none';
 
     setTimeout(() => {
-        if (scenario.car_passes || scenario.driver_stops === false || scenario.action === 'go') {
+        if (speedo) speedo.style.display = 'block';
+
+        if ('location' in scenario) {
+            car.style.left = '55%';
+            status.textContent = 'The car parked here — was that correct?';
+        } else if ('label' in scenario) {
+            car.style.left = '25%';
+            status.textContent = 'Was this the correct action?';
+        } else if ('speed' in scenario) {
+            car.style.left = '80%';
+            status.textContent = 'Was that speed correct for this sign?';
+        } else if ('arriving_order' in scenario) {
+            car.style.left = (scenario.action === 'go') ? '75%' : '40%';
+            status.textContent = (scenario.action === 'go') ? 'The car proceeded — was that correct?' : 'The car waited — was that correct?';
+        } else if (scenario.car_passes || scenario.driver_stops === false) {
             car.style.left = '90%';
             status.textContent = 'The car drove through — was that correct?';
         } else {
@@ -726,7 +884,7 @@ function submitSimQuiz() {
         return;
     }
     document.getElementById('simQuizForm').submit();
-}
+}s
 </script>
 
-<?php include 'includes/footer.php'; ?>
+<?php include 'includes/footer.php'; ?> 

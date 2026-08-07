@@ -165,11 +165,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <!-- Action Buttons -->
-<!-- Action Buttons -->
 <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px;">
     <a href="/testmate/quiz.php?topic=<?= $tid ?>" class="btn btn-primary">Try Again</a>
     <?php if ($failed_count > 0): ?>
-    <a href="/testmate/quiz.php?topic=<?= $tid ?>&=retry" class="btn btn-outline" style="border-color:#e74c3c;color:#e74c3c;">
+    <a href="/testmate/quiz.php?topic=<?= $tid ?>&mode=retry" class="btn btn-outline" style="border-color:#e74c3c;color:#e74c3c;">
         Retry Failed Questions
     </a>
     <?php endif; ?>
@@ -187,11 +186,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         You can read the material or watch the animated video explanations.
     </p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <a href="/testmate/study-materials.php?topic=<?= $tid ?>&ode=read"
+        <a href="/testmate/study-materials.php?topic=<?= $tid ?>&mode=read"
            class="btn btn-outline" style="font-size:14px;padding:8px 18px;">
             Read <?= htmlspecialchars($rtopic['name']) ?>
         </a>
-        <a href="/testmate/study-materials.php?topic=<?= $tid ?>&=video"
+        <a href="/testmate/study-materials.php?topic=<?= $tid ?>&mode=video"
            class="btn btn-primary" style="font-size:14px;padding:8px 18px;background:#e67e22;border:none;">
             Watch Video Explanations
         </a>
@@ -250,7 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     or
     <a href="/testmate/study-materials.php?topic=<?= $tid ?>&mode=video" style="color:#e67e22;font-weight:600;">Watch the video</a>
 </div>
-<?php endif; ?>ssss
+<?php endif; ?>
     <?php endforeach; ?>
 
 <?php elseif ($topic_id > 0 && !empty($questions)): ?>
