@@ -35,7 +35,7 @@ $top_quiz = $conn->query("
 <?php include 'includes/header.php'; ?>
 
 <div class="page-header">
-    <h1>Leaderboard</h1>
+    <h1>Rankings</h1>
     <p>Top performers on TestMate — see how you compare</p>
 </div>
 

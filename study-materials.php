@@ -294,6 +294,10 @@ if (isset($_GET['topic'])) {
                     </div>
                 </div>
                 <?php endif; ?>
+                <?php if ($mat['file_type'] === 'video' && $mat['file_path']): ?>
+                <video src="<?= htmlspecialchars($mat['file_path']) ?>" controls
+                       style="max-width:100%;border-radius:8px;margin-top:14px;display:block;"></video>
+                <?php endif; ?>
             </div>
             <?php endforeach; ?>
         <?php else: ?>

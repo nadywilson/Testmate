@@ -53,7 +53,7 @@ if (session_status() === PHP_SESSION_NONE) session_start();
         <a href="/testmate/quiz.php">Quizzes</a>
         <a href="/testmate/mock-test.php">Mock Test</a>
         <a href="/testmate/progress.php">Progress</a>
-        <a href="/testmate/leaderboard.php">Leaderboard</a>
+        <a href="/testmate/rankings.php">Rankings</a>
         <a href="/testmate/profile.php">Profile</a>
         <a href="/testmate/logout.php" class="btn-logout">
             Logout (<?= htmlspecialchars($_SESSION['name'] ?? 'User') ?>)

@@ -72,8 +72,16 @@ $questions = $result->fetch_all(MYSQLI_ASSOC);
                 <span class="q-cat"><?= htmlspecialchars($q['topic_name']) ?></span>
             </div>
 
-            <?php if (!empty($q['image_path'])): ?>
-            <img src="<?= htmlspecialchars($q['image_path']) ?>" class="q-image" alt="Question image">
+            <?php if (!empty($q['image_path'])):
+                $ftype = $q['file_type'] ?? 'image';
+            ?>
+                <?php if ($ftype === 'pdf'): ?>
+                <iframe src="<?= htmlspecialchars($q['image_path']) ?>" style="width:100%;height:300px;border:1px solid #eee;border-radius:8px;margin-bottom:14px;"></iframe>
+                <?php elseif ($ftype === 'video'): ?>
+                <video src="<?= htmlspecialchars($q['image_path']) ?>" controls class="q-image"></video>
+                <?php else: ?>
+                <img src="<?= htmlspecialchars($q['image_path']) ?>" class="q-image" alt="Question image">
+                <?php endif; ?>
             <?php endif; ?>
 
             <p class="q-text"><?= htmlspecialchars($q['question']) ?></p>
@@ -85,6 +93,8 @@ $questions = $result->fetch_all(MYSQLI_ASSOC);
             <input type="hidden" name="optb[]"    value="<?= htmlspecialchars($q['option_b']) ?>">
             <input type="hidden" name="optc[]"    value="<?= htmlspecialchars($q['option_c']) ?>">
             <input type="hidden" name="optd[]"    value="<?= htmlspecialchars($q['option_d']) ?>">
+            <input type="hidden" name="topic_ids[]" value="<?= (int)$q['topic_id'] ?>">
+            <input type="hidden" name="topic_names[]" value="<?= htmlspecialchars($q['topic_name']) ?>">
 
             <div class="options">
                 <?php foreach (['A'=>$q['option_a'],'B'=>$q['option_b'],'C'=>$q['option_c'],'D'=>$q['option_d']] as $key=>$val): ?>
