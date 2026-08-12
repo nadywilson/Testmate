@@ -7,7 +7,7 @@ $name    = $_SESSION['name'];
 
 // Quiz scores per topic
 $topic_scores = $conn->prepare("
-    SELECT t.name, t.icon,
+    SELECT t.id AS topic_id, t.name, t.icon,
            ROUND(AVG(qs.score / qs.total * 100)) AS avg_pct,
            COUNT(qs.id) AS attempts,
            MAX(qs.score) AS best_score,
@@ -57,6 +57,19 @@ $weak = array_filter($topic_scores, fn($t) => $t['avg_pct'] < 60);
 ?>
 <?php include 'includes/header.php'; ?>
 
+<style>
+.stat-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    transition: transform .15s, box-shadow .15s;
+}
+.stat-card-link:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 18px rgba(0,0,0,.08);
+}
+</style>
+
 <div class="page-header">
     <h1>📊 My Progress</h1>
     <p>Track your performance and see where to focus next</p>
@@ -95,24 +108,32 @@ $weak = array_filter($topic_scores, fn($t) => $t['avg_pct'] < 60);
         </div>
     </div>
 
-    <!-- Summary Stats -->
+    <!-- Summary Stats (each card links to the relevant detail) -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:28px;">
-        <div class="card" style="text-align:center;">
-            <div style="font-size:2rem;font-weight:800;color:#3498db;"><?= $total_quizzes ?></div>
-            <div style="font-size:13px;color:#888;margin-top:4px;">Quizzes Taken</div>
-        </div>
-        <div class="card" style="text-align:center;">
-            <div style="font-size:2rem;font-weight:800;color:#2c3e50;"><?= $mock_stats['cnt'] ?></div>
-            <div style="font-size:13px;color:#888;margin-top:4px;">Mock Tests Taken</div>
-        </div>
-        <div class="card" style="text-align:center;">
-            <div style="font-size:2rem;font-weight:800;color:#27ae60;"><?= $mock_stats['passed_cnt'] ?></div>
-            <div style="font-size:13px;color:#888;margin-top:4px;">Mock Tests Passed</div>
-        </div>
-        <div class="card" style="text-align:center;">
-            <div style="font-size:2rem;font-weight:800;color:#e74c3c;"><?= count($weak) ?></div>
-            <div style="font-size:13px;color:#888;margin-top:4px;">Weak Topics</div>
-        </div>
+        <a href="/testmate/quiz.php" class="stat-card-link">
+            <div class="card" style="text-align:center;">
+                <div style="font-size:2rem;font-weight:800;color:#3498db;"><?= $total_quizzes ?></div>
+                <div style="font-size:13px;color:#888;margin-top:4px;">Quizzes Taken</div>
+            </div>
+        </a>
+        <a href="#mockHistory" class="stat-card-link">
+            <div class="card" style="text-align:center;">
+                <div style="font-size:2rem;font-weight:800;color:#2c3e50;"><?= $mock_stats['cnt'] ?></div>
+                <div style="font-size:13px;color:#888;margin-top:4px;">Mock Tests Taken</div>
+            </div>
+        </a>
+        <a href="#mockHistory" class="stat-card-link">
+            <div class="card" style="text-align:center;">
+                <div style="font-size:2rem;font-weight:800;color:#27ae60;"><?= $mock_stats['passed_cnt'] ?></div>
+                <div style="font-size:13px;color:#888;margin-top:4px;">Mock Tests Passed</div>
+            </div>
+        </a>
+        <a href="<?= !empty($weak) ? '#weakTopics' : '/testmate/study-materials.php' ?>" class="stat-card-link">
+            <div class="card" style="text-align:center;">
+                <div style="font-size:2rem;font-weight:800;color:#e74c3c;"><?= count($weak) ?></div>
+                <div style="font-size:13px;color:#888;margin-top:4px;">Weak Topics</div>
+            </div>
+        </a>
     </div>
 
     <!-- Topic Performance -->
@@ -153,11 +174,11 @@ $weak = array_filter($topic_scores, fn($t) => $t['avg_pct'] < 60);
 
     <!-- Weak Areas -->
     <?php if (!empty($weak)): ?>
-    <div style="background:#fff8f0;border:1px solid #f5cba7;border-radius:12px;padding:20px;margin-bottom:28px;">
+    <div id="weakTopics" style="background:#fff8f0;border:1px solid #f5cba7;border-radius:12px;padding:20px;margin-bottom:28px;scroll-margin-top:80px;">
         <h3 style="color:#e67e22;font-size:16px;margin-bottom:12px;">⚠️ Focus on These Topics</h3>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
             <?php foreach ($weak as $wt): ?>
-            <a href="/testmate/study-materials.php?topic=<?= array_search($wt, $topic_scores) + 1 ?>"
+            <a href="/testmate/study-materials.php?topic=<?= (int)$wt['topic_id'] ?>"
                style="background:#fdebd0;color:#ca6f1e;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;text-decoration:none;">
                 <?= $wt['icon'] ?> <?= htmlspecialchars($wt['name']) ?> — <?= round($wt['avg_pct']) ?>%
             </a>
@@ -168,7 +189,7 @@ $weak = array_filter($topic_scores, fn($t) => $t['avg_pct'] < 60);
     <?php endif; ?>
 
     <!-- Mock Test History -->
-    <h2 style="font-size:18px;font-weight:700;margin-bottom:16px;">⏱️ Mock Test History</h2>
+    <h2 id="mockHistory" style="font-size:18px;font-weight:700;margin-bottom:16px;scroll-margin-top:80px;">⏱️ Mock Test History</h2>
 
     <?php if (empty($mock_history)): ?>
     <div class="card" style="text-align:center;padding:40px;margin-bottom:28px;">

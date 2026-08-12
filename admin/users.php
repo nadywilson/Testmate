@@ -84,6 +84,16 @@ $users = $conn->query("
     GROUP BY u.id
     ORDER BY u.created_at DESC
 ")->fetch_all(MYSQLI_ASSOC);
+
+// Count passed mocks safely
+$passed_mocks = 0;
+foreach ($user_mocks as $m) {
+    if ($m['passed']) $passed_mocks++;
+}
+$pending_assigned = 0;
+foreach ($user_assigned as $a) {
+    if (!$a['is_completed']) $pending_assigned++;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -116,7 +126,9 @@ $users = $conn->query("
     <div class="sidebar">
         <h3>Main</h3>
         <a href="/testmate/admin/index.php">Dashboard</a>
+        <a href="/testmate/admin/review-scores.php">Review Scores</a>
         <a href="/testmate/admin/users.php" class="active">Users</a>
+        <a href="/testmate/admin/add-user.php">Add User</a>
         <a href="/testmate/admin/stats.php">Statistics</a>
         <h3>Questions</h3>
         <a href="/testmate/admin/questions.php">All Questions</a>
@@ -137,15 +149,15 @@ $users = $conn->query("
         <!-- User Detail View -->
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
             <div>
-                <h1 style="font-size:22px;margin-bottom:4px;"><?= htmlspecialchars($user_detail['name']) ?></h1>
-                <p style="color:#888;font-size:14px;"><?= htmlspecialchars($user_detail['email']) ?> · Joined <?= date('d M Y', strtotime($user_detail['created_at'])) ?> · <?= $user_detail['licence_code'] ?? 'Code2' ?></p>
+                <h1 style="font-size:22px;margin-bottom:4px;"><?php echo htmlspecialchars($user_detail['name']); ?></h1>
+                <p style="color:#888;font-size:14px;"><?php echo htmlspecialchars($user_detail['email']); ?> · Joined <?php echo date('d M Y', strtotime($user_detail['created_at'])); ?> · <?php echo $user_detail['licence_code'] ?? 'Code2'; ?></p>
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
                 <a href="/testmate/admin/assign-quiz.php" class="btn btn-primary" style="font-size:14px;padding:8px 16px;">Assign Questions</a>
                 <a href="/testmate/admin/users.php" class="btn btn-outline">Back to Users</a>
                 <?php if ($user_detail['role'] !== 'admin'): ?>
-                <a href="/testmate/admin/users.php?delete=<?= $user_detail['id'] ?>"
-                   onclick="return confirm('Delete <?= htmlspecialchars($user_detail['name']) ?>? This cannot be undone.')"
+                <a href="/testmate/admin/users.php?delete=<?php echo $user_detail['id']; ?>"
+                   onclick="return confirm('Delete <?php echo htmlspecialchars($user_detail['name']); ?>? This cannot be undone.')"
                    class="btn" style="background:#e74c3c;color:white;">Delete User</a>
                 <?php endif; ?>
             </div>
@@ -153,43 +165,48 @@ $users = $conn->query("
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin-bottom:24px;">
             <div class="card" style="text-align:center;">
-                <div style="font-size:2rem;font-weight:800;color:#3498db;"><?= count($user_quizzes) ?></div>
+                <div style="font-size:2rem;font-weight:800;color:#3498db;"><?php echo count($user_quizzes); ?></div>
                 <div style="font-size:13px;color:#888;">Quizzes Taken</div>
             </div>
             <div class="card" style="text-align:center;">
-                <div style="font-size:2rem;font-weight:800;color:#2c3e50;"><?= count($user_mocks) ?></div>
+                <div style="font-size:2rem;font-weight:800;color:#2c3e50;"><?php echo count($user_mocks); ?></div>
                 <div style="font-size:13px;color:#888;">Mock Tests</div>
             </div>
             <div class="card" style="text-align:center;">
-                <div style="font-size:2rem;font-weight:800;color:#27ae60;"><?= count(array_filter($user_mocks, fn($m) => $m['passed'])) ?></div>
+                <div style="font-size:2rem;font-weight:800;color:#27ae60;"><?php echo $passed_mocks; ?></div>
                 <div style="font-size:13px;color:#888;">Tests Passed</div>
             </div>
             <div class="card" style="text-align:center;">
-                <div style="font-size:2rem;font-weight:800;color:#e74c3c;"><?= count($user_failed) ?></div>
+                <div style="font-size:2rem;font-weight:800;color:#e74c3c;"><?php echo count($user_failed); ?></div>
                 <div style="font-size:13px;color:#888;">Failed Questions</div>
             </div>
             <div class="card" style="text-align:center;">
-                <div style="font-size:2rem;font-weight:800;color:#3498db;"><?= count(array_filter($user_assigned, fn($a) => !$a['is_completed'])) ?></div>
+                <div style="font-size:2rem;font-weight:800;color:#3498db;"><?php echo $pending_assigned; ?></div>
                 <div style="font-size:13px;color:#888;">Pending Assignments</div>
             </div>
         </div>
 
         <!-- Failed Questions -->
         <?php if (!empty($user_failed)): ?>
-        <h2 style="font-size:18px;font-weight:700;margin-bottom:14px;">Failed Questions (<?= count($user_failed) ?>)</h2>
+        <h2 style="font-size:18px;font-weight:700;margin-bottom:14px;">Failed Questions (<?php echo count($user_failed); ?>)</h2>
         <div style="margin-bottom:24px;">
             <?php foreach ($user_failed as $fq): ?>
             <div class="card" style="margin-bottom:12px;border-left:4px solid #e74c3c;padding:16px 20px;">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px;">
-                    <span style="font-size:12px;background:#f0f0f0;padding:3px 10px;border-radius:20px;color:#666;"><?= htmlspecialchars($fq['topic_name']) ?></span>
-                    <span class="failed-tag">Failed <?= $fq['times_failed'] ?> time<?= $fq['times_failed'] > 1 ? 's' : '' ?></span>
+                    <span style="font-size:12px;background:#f0f0f0;padding:3px 10px;border-radius:20px;color:#666;"><?php echo htmlspecialchars($fq['topic_name']); ?></span>
+                    <span class="failed-tag">Failed <?php echo $fq['times_failed']; ?> time<?php echo $fq['times_failed'] > 1 ? 's' : ''; ?></span>
                 </div>
-                <p style="font-size:14px;font-weight:500;margin-bottom:8px;"><?= htmlspecialchars($fq['question']) ?></p>
+                <p style="font-size:14px;font-weight:500;margin-bottom:8px;"><?php echo htmlspecialchars($fq['question']); ?></p>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-                    <?php foreach (['A'=>$fq['option_a'],'B'=>$fq['option_b'],'C'=>$fq['option_c'],'D'=>$fq['option_d']] as $key=>$val): ?>
-                    <div style="background:<?= strtoupper($fq['correct_answer']) === $key ? '#eafaf1' : '#f8f9fa' ?>;padding:6px 10px;border-radius:6px;font-size:13px;">
-                        <strong><?= $key ?>.</strong> <?= htmlspecialchars($val) ?>
-                        <?= strtoupper($fq['correct_answer']) === $key ? ' ✓' : '' ?>
+                    <?php 
+                    $opts = ['A'=>$fq['option_a'],'B'=>$fq['option_b'],'C'=>$fq['option_c'],'D'=>$fq['option_d']];
+                    foreach ($opts as $key=>$val): 
+                        $is_correct = strtoupper($fq['correct_answer']) === $key;
+                        $bg = $is_correct ? '#eafaf1' : '#f8f9fa';
+                    ?>
+                    <div style="background:<?php echo $bg; ?>;padding:6px 10px;border-radius:6px;font-size:13px;">
+                        <strong><?php echo $key; ?>.</strong> <?php echo htmlspecialchars($val); ?>
+                        <?php if ($is_correct) echo ' ✓'; ?>
                     </div>
                     <?php endforeach; ?>
                 </div>
@@ -200,15 +217,15 @@ $users = $conn->query("
 
         <!-- Assigned Quizzes -->
         <?php if (!empty($user_assigned)): ?>
-        <h2 style="font-size:18px;font-weight:700;margin-bottom:14px;">Assigned Questions (<?= count($user_assigned) ?>)</h2>
+        <h2 style="font-size:18px;font-weight:700;margin-bottom:14px;">Assigned Questions (<?php echo count($user_assigned); ?>)</h2>
         <div class="table-wrap" style="margin-bottom:24px;">
             <table>
                 <thead><tr><th>Question</th><th>Assigned</th><th>Status</th></tr></thead>
                 <tbody>
                 <?php foreach ($user_assigned as $a): ?>
                 <tr>
-                    <td style="font-size:13px;"><?= htmlspecialchars(substr($a['question_text'], 0, 80)) ?>...</td>
-                    <td style="font-size:13px;color:#888;"><?= date('d M Y', strtotime($a['assigned_at'])) ?></td>
+                    <td style="font-size:13px;"><?php echo htmlspecialchars(substr($a['question_text'], 0, 80)); ?>...</td>
+                    <td style="font-size:13px;color:#888;"><?php echo date('d M Y', strtotime($a['assigned_at'])); ?></td>
                     <td>
                         <?php if ($a['is_completed']): ?>
                             <span class="badge badge-pass">Completed</span>
@@ -236,10 +253,10 @@ $users = $conn->query("
                     $pct = round($uq['score']/$uq['total']*100);
                 ?>
                 <tr>
-                    <td><?= htmlspecialchars($uq['topic_name']) ?></td>
-                    <td><?= $uq['score'] ?>/<?= $uq['total'] ?></td>
-                    <td><span class="badge <?= $pct >= 80 ? 'badge-pass' : 'badge-fail' ?>"><?= $pct ?>%</span></td>
-                    <td style="font-size:13px;color:#888;"><?= date('d M Y H:i', strtotime($uq['taken_at'])) ?></td>
+                    <td><?php echo htmlspecialchars($uq['topic_name']); ?></td>
+                    <td><?php echo $uq['score']; ?>/<?php echo $uq['total']; ?></td>
+                    <td><span class="badge <?php echo $pct >= 80 ? 'badge-pass' : 'badge-fail'; ?>"><?php echo $pct; ?>%</span></td>
+                    <td style="font-size:13px;color:#888;"><?php echo date('d M Y H:i', strtotime($uq['taken_at'])); ?></td>
                 </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -262,11 +279,11 @@ $users = $conn->query("
                     $secs = $um['time_taken']%60;
                 ?>
                 <tr>
-                    <td><?= $um['score'] ?>/<?= $um['total'] ?></td>
-                    <td><?= $pct ?>%</td>
-                    <td><?= $mins ?>m <?= $secs ?>s</td>
-                    <td><span class="badge <?= $um['passed'] ? 'badge-pass' : 'badge-fail' ?>"><?= $um['passed'] ? 'PASSED' : 'FAILED' ?></span></td>
-                    <td style="font-size:13px;color:#888;"><?= date('d M Y H:i', strtotime($um['taken_at'])) ?></td>
+                    <td><?php echo $um['score']; ?>/<?php echo $um['total']; ?></td>
+                    <td><?php echo $pct; ?>%</td>
+                    <td><?php echo $mins; ?>m <?php echo $secs; ?>s</td>
+                    <td><span class="badge <?php echo $um['passed'] ? 'badge-pass' : 'badge-fail'; ?>"><?php echo $um['passed'] ? 'PASSED' : 'FAILED'; ?></span></td>
+                    <td style="font-size:13px;color:#888;"><?php echo date('d M Y H:i', strtotime($um['taken_at'])); ?></td>
                 </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -277,8 +294,11 @@ $users = $conn->query("
         <?php else: ?>
         <!-- User List -->
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-            <h1 style="font-size:22px;">All Users (<?= count($users) ?>)</h1>
-            <a href="/testmate/admin/assign-quiz.php" class="btn btn-primary" style="font-size:14px;padding:8px 16px;">Assign Quiz</a>
+            <h1 style="font-size:22px;">All Users (<?php echo count($users); ?>)</h1>
+            <div>
+                <a href="/testmate/admin/add-user.php" class="btn btn-primary" style="font-size:14px;padding:8px 16px;margin-right:8px;">Add User</a>
+                <a href="/testmate/admin/assign-quiz.php" class="btn btn-primary" style="font-size:14px;padding:8px 16px;">Assign Quiz</a>
+            </div>
         </div>
 
         <div class="table-wrap">
@@ -289,9 +309,9 @@ $users = $conn->query("
                 <tbody>
                 <?php foreach ($users as $u): ?>
                 <tr>
-                    <td style="font-weight:600;"><?= htmlspecialchars($u['name']) ?></td>
-                    <td style="color:#888;font-size:13px;"><?= htmlspecialchars($u['email']) ?></td>
-                    <td style="font-size:13px;"><?= $u['licence_code'] ?? 'Code2' ?></td>
+                    <td style="font-weight:600;"><?php echo htmlspecialchars($u['name']); ?></td>
+                    <td style="color:#888;font-size:13px;"><?php echo htmlspecialchars($u['email']); ?></td>
+                    <td style="font-size:13px;"><?php echo $u['licence_code'] ?? 'Code2'; ?></td>
                     <td>
                         <?php if ($u['role'] === 'admin'): ?>
                             <span class="badge" style="background:#fdecea;color:#e74c3c;">Admin</span>
@@ -299,29 +319,29 @@ $users = $conn->query("
                             <span class="badge" style="background:#eafaf1;color:#27ae60;">User</span>
                         <?php endif; ?>
                     </td>
-                    <td><?= $u['quizzes'] ?></td>
-                    <td><?= $u['mocks'] ?></td>
+                    <td><?php echo $u['quizzes']; ?></td>
+                    <td><?php echo $u['mocks']; ?></td>
                     <td>
                         <?php if ($u['failed_q'] > 0): ?>
-                        <span class="failed-tag"><?= $u['failed_q'] ?></span>
+                        <span class="failed-tag"><?php echo $u['failed_q']; ?></span>
                         <?php else: ?>
                         <span style="color:#27ae60;font-size:13px;">None</span>
                         <?php endif; ?>
                     </td>
                     <td>
                         <?php if ($u['assigned'] > 0): ?>
-                        <span class="pending-tag"><?= $u['assigned'] ?></span>
+                        <span class="pending-tag"><?php echo $u['assigned']; ?></span>
                         <?php else: ?>
                         <span style="color:#888;font-size:13px;">—</span>
                         <?php endif; ?>
                     </td>
-                    <td style="font-size:13px;color:#888;"><?= date('d M Y', strtotime($u['created_at'])) ?></td>
+                    <td style="font-size:13px;color:#888;"><?php echo date('d M Y', strtotime($u['created_at'])); ?></td>
                     <td style="white-space:nowrap;">
-                        <a href="/testmate/admin/users.php?view=<?= $u['id'] ?>"
+                        <a href="/testmate/admin/users.php?view=<?php echo $u['id']; ?>"
                            style="color:#3498db;font-size:13px;text-decoration:none;margin-right:10px;">View</a>
                         <?php if ($u['role'] !== 'admin'): ?>
-                        <a href="/testmate/admin/users.php?delete=<?= $u['id'] ?>"
-                           onclick="return confirm('Delete <?= htmlspecialchars($u['name']) ?>?')"
+                        <a href="/testmate/admin/users.php?delete=<?php echo $u['id']; ?>"
+                           onclick="return confirm('Delete <?php echo htmlspecialchars($u['name']); ?>?')"
                            style="color:#e74c3c;font-size:13px;text-decoration:none;">Delete</a>
                         <?php endif; ?>
                     </td>

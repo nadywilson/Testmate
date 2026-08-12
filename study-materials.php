@@ -294,9 +294,29 @@ if (isset($_GET['topic'])) {
                     </div>
                 </div>
                 <?php endif; ?>
-                <?php if ($mat['file_type'] === 'video' && $mat['file_path']): ?>
-                <video src="<?= htmlspecialchars($mat['file_path']) ?>" controls
-                       style="max-width:100%;border-radius:8px;margin-top:14px;display:block;"></video>
+                <?php if ($mat['file_type'] === 'video' && $mat['file_path']):
+                    $vext = strtolower(pathinfo($mat['file_path'], PATHINFO_EXTENSION));
+                    $vmime_map = ['mp4'=>'video/mp4', 'webm'=>'video/webm', 'mov'=>'video/quicktime'];
+                    $vmime = $vmime_map[$vext] ?? 'video/mp4';
+                    $vid_id = 'mat-vid-' . $mat['id'];
+                ?>
+                <div style="margin-top:14px;">
+                    <video id="<?= $vid_id ?>" controls preload="metadata"
+                           style="max-width:100%;border-radius:8px;display:block;background:#000;">
+                        <source src="<?= htmlspecialchars($mat['file_path']) ?>" type="<?= $vmime ?>">
+                        Your browser does not support this video format.
+                    </video>
+                    <div id="<?= $vid_id ?>-fallback" style="display:none;margin-top:8px;padding:10px 14px;background:#fdecea;border-left:3px solid #e74c3c;border-radius:0 6px 6px 0;font-size:13px;color:#c0392b;">
+                        This video can't play in your browser (likely an unsupported format, e.g. an iPhone .mov file).
+                        <a href="<?= htmlspecialchars($mat['file_path']) ?>" download style="color:#c0392b;font-weight:600;">Download it instead</a>,
+                        or ask your admin to re-save it as an MP4 (H.264) file.
+                    </div>
+                </div>
+                <script>
+                document.getElementById('<?= $vid_id ?>').addEventListener('error', function() {
+                    document.getElementById('<?= $vid_id ?>-fallback').style.display = 'block';
+                }, true);
+                </script>
                 <?php endif; ?>
             </div>
             <?php endforeach; ?>

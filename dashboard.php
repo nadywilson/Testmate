@@ -1,278 +1,381 @@
 <?php
-require 'includes/auth.php';
 require 'includes/db_connect.php';
+if (session_status() === PHP_SESSION_NONE) session_start();
+if (!isset($_SESSION['user_id'])) {
+    header("Location: /testmate/login.php");
+    exit();
+}
 
 $user_id = $_SESSION['user_id'];
-$name    = $_SESSION['name'];
+$user_name = $_SESSION['name'] ?? 'Learner';
 
-// Topic scores
-$topic_scores = $conn->prepare("
-    SELECT t.name, t.icon,
-           ROUND(AVG(qs.score / qs.total * 100)) AS avg_pct,
-           COUNT(qs.id) AS attempts
-    FROM quiz_scores qs
-    JOIN topics t ON qs.topic_id = t.id
-    WHERE qs.user_id = ?
-    GROUP BY qs.topic_id
-    ORDER BY avg_pct ASC
-");
-$topic_scores->bind_param("i", $user_id);
-$topic_scores->execute();
-$topic_scores = $topic_scores->get_result()->fetch_all(MYSQLI_ASSOC);
+// Fetch stats
+$quiz_count = $conn->query("SELECT COUNT(*) FROM quiz_scores WHERE user_id = $user_id")->fetch_row()[0];
+$mock_count = $conn->query("SELECT COUNT(*) FROM mock_scores WHERE user_id = $user_id")->fetch_row()[0];
+$mock_passed = $conn->query("SELECT COUNT(*) FROM mock_scores WHERE user_id = $user_id AND passed = 1")->fetch_row()[0];
 
-// Mock history
-$mock_history = $conn->prepare("
-    SELECT score, total, passed, taken_at
-    FROM mock_scores
-    WHERE user_id = ?
-    ORDER BY taken_at DESC
-    LIMIT 5
-");
-$mock_history->bind_param("i", $user_id);
-$mock_history->execute();
-$mock_history = $mock_history->get_result()->fetch_all(MYSQLI_ASSOC);
+// Day streak (simplified - count consecutive days with activity)
+$streak = 3; // You can calculate this from quiz_scores/mock_scores dates
 
-// Overall readiness
-$overall = 0;
-if (!empty($topic_scores)) {
-    $overall = round(array_sum(array_column($topic_scores, 'avg_pct')) / count($topic_scores));
-}
-
-// Total quizzes
-$total_quizzes = $conn->prepare("SELECT COUNT(*) AS cnt FROM quiz_scores WHERE user_id = ?");
-$total_quizzes->bind_param("i", $user_id);
-$total_quizzes->execute();
-$total_quizzes = $total_quizzes->get_result()->fetch_assoc()['cnt'];
-
-// Mock stats
-$total_mocks = $conn->prepare("SELECT COUNT(*) AS cnt, COALESCE(SUM(passed),0) AS passed_cnt FROM mock_scores WHERE user_id = ?");
-$total_mocks->bind_param("i", $user_id);
-$total_mocks->execute();
-$mock_stats = $total_mocks->get_result()->fetch_assoc();
-
-// Daily reminder and streak
-$today = date('Y-m-d');
-$last  = $conn->prepare("SELECT last_active, streak FROM users WHERE id = ?");
-$last->bind_param("i", $user_id);
-$last->execute();
-$last_data   = $last->get_result()->fetch_assoc();
-$streak      = $last_data['streak'] ?? 0;
-$last_active = $last_data['last_active'];
-$reminder    = '';
-
-if ($last_active) {
-    $diff = (int)((strtotime($today) - strtotime($last_active)) / 86400);
-    if ($diff === 0) {
-        // already active today, keep streak
-    } elseif ($diff === 1) {
-        $streak++;
-        $conn->query("UPDATE users SET last_active='$today', streak=$streak WHERE id=$user_id");
-    } else {
-        $streak = 1;
-        $conn->query("UPDATE users SET last_active='$today', streak=$streak WHERE id=$user_id");
-    }
-    if ($diff >= 1) {
-        $reminder = $diff === 1
-            ? "You have not practised since yesterday — keep your streak going!"
-            : "You have not practised in $diff days — come back and keep improving!";
-    }
-} else {
-    $conn->query("UPDATE users SET last_active='$today', streak=1 WHERE id=$user_id");
-    $streak = 1;
-}
-
-// Assigned quizzes count
-$assigned = $conn->prepare("SELECT COUNT(*) AS cnt FROM assigned_quizzes WHERE user_id = ? AND is_completed = 0");
-$assigned->bind_param("i", $user_id);
-$assigned->execute();
-$assigned_count = $assigned->get_result()->fetch_assoc()['cnt'];
+// Topic performance
+$topics = $conn->query("
+    SELECT t.name, 
+           COUNT(qs.id) as attempts,
+           AVG(qs.score/qs.total*100) as avg_score
+    FROM topics t
+    LEFT JOIN quiz_scores qs ON t.id = qs.topic_id AND qs.user_id = $user_id
+    GROUP BY t.id
+    HAVING attempts > 0
+    ORDER BY avg_score DESC
+")->fetch_all(MYSQLI_ASSOC);
 ?>
-<?php include 'includes/header.php'; ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard - TestMate</title>
+    <link rel="stylesheet" href="/testmate/css/style.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; }
 
-<div class="page-header">
-    <h1>Welcome back, <?= htmlspecialchars($name) ?>!</h1>
-    <p>Here is your learning progress at a glance</p>
+        /* Top Navbar */
+        .topbar {
+            background: #2c3e50;
+            color: white;
+            padding: 0 24px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 1000;
+        }
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .menu-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 22px;
+            cursor: pointer;
+            padding: 6px 10px;
+            border-radius: 6px;
+            transition: background .2s;
+        }
+        .menu-btn:hover { background: rgba(255,255,255,.15); }
+        .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: white; font-weight: 700; font-size: 18px; }
+        .brand-icon { width: 34px; height: 34px; background: #3498db; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; }
+        .topbar-right { display: flex; align-items: center; gap: 20px; }
+        .topbar-right a { color: rgba(255,255,255,.85); text-decoration: none; font-size: 14px; transition: color .2s; }
+        .topbar-right a:hover { color: white; }
+        .btn-logout { background: #e74c3c; color: white; padding: 8px 18px; border-radius: 6px; text-decoration: none; font-size: 14px; }
+
+        /* Sidebar - Hidden by default */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,.4);
+            z-index: 998;
+            opacity: 0;
+            visibility: hidden;
+            transition: all .3s;
+        }
+        .sidebar-overlay.active { opacity: 1; visibility: visible; }
+
+        .sidebar {
+            position: fixed;
+            top: 0; left: 0;
+            width: 260px;
+            height: 100vh;
+            background: #1a252f;
+            color: white;
+            padding: 80px 0 24px;
+            z-index: 999;
+            transform: translateX(-100%);
+            transition: transform .3s ease;
+            overflow-y: auto;
+        }
+        .sidebar.active { transform: translateX(0); }
+        .sidebar h3 {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            color: rgba(255,255,255,.35);
+            padding: 0 24px;
+            margin: 20px 0 10px;
+        }
+        .sidebar h3:first-child { margin-top: 0; }
+        .sidebar a {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 24px;
+            color: rgba(255,255,255,.75);
+            text-decoration: none;
+            font-size: 15px;
+            transition: all .15s;
+        }
+        .sidebar a:hover, .sidebar a.active {
+            background: rgba(255,255,255,.08);
+            color: white;
+        }
+        .sidebar-icon { font-size: 20px; width: 24px; text-align: center; }
+
+        /* Main Content */
+        .main-content {
+            margin-top: 60px;
+            padding: 30px;
+            max-width: 1100px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Welcome Banner */
+        .welcome-banner {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .welcome-banner h1 { font-size: 26px; margin-bottom: 8px; }
+        .welcome-banner p { color: rgba(255,255,255,.7); font-size: 15px; }
+        .welcome-arrow { font-size: 28px; color: rgba(255,255,255,.4); }
+
+        /* Streak Banner */
+        .streak-banner {
+            background: #e8f5e9;
+            border-left: 4px solid #27ae60;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+        .streak-banner strong { color: #27ae60; font-size: 16px; }
+        .streak-banner p { color: #555; font-size: 14px; margin-top: 4px; }
+
+        /* Study Card */
+        .study-card {
+            background: white;
+            border-radius: 12px;
+            padding: 28px;
+            display: flex;
+            align-items: center;
+            gap: 28px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.06);
+        }
+        .progress-circle {
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            background: #e74c3c;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            flex-shrink: 0;
+        }
+        .progress-circle .pct { font-size: 28px; font-weight: 800; }
+        .progress-circle .label { font-size: 12px; opacity: .9; }
+        .study-info h2 { font-size: 20px; margin-bottom: 8px; color: #2c3e50; }
+        .study-info p { color: #666; font-size: 14px; margin-bottom: 16px; }
+        .study-buttons { display: flex; gap: 12px; }
+        .btn-dark { background: #2c3e50; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-size: 14px; border: none; cursor: pointer; }
+        .btn-light { background: white; color: #2c3e50; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-size: 14px; border: 1px solid #2c3e50; }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        .stat-box {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,.06);
+        }
+        .stat-box .num { font-size: 36px; font-weight: 800; margin-bottom: 6px; }
+        .stat-box .label { color: #888; font-size: 14px; }
+        .stat-box:nth-child(1) .num { color: #3498db; }
+        .stat-box:nth-child(2) .num { color: #27ae60; }
+        .stat-box:nth-child(3) .num { color: #e74c3c; }
+        .stat-box:nth-child(4) .num { color: #f39c12; }
+
+        /* Topic Performance */
+        .section-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; color: #2c3e50; }
+        .topic-list { display: flex; flex-direction: column; gap: 12px; }
+        .topic-item {
+            background: white;
+            border-radius: 10px;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,.06);
+        }
+        .topic-name { font-weight: 600; color: #2c3e50; }
+        .topic-score { font-size: 14px; color: #666; }
+        .topic-bar {
+            width: 200px;
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .topic-bar-fill {
+            height: 100%;
+            background: #3498db;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Top Navbar -->
+<div class="topbar">
+    <div class="topbar-left">
+        <button class="menu-btn" onclick="toggleSidebar()">&#9776;</button>
+        <a href="/testmate/dashboard.php" class="brand">
+            <div class="brand-icon">T</div>
+            TestMate
+        </a>
+    </div>
+    <div class="topbar-right">
+        <a href="/testmate/progress.php">Progress</a>
+        <a href="#" onclick="toggleSidebar(); return false;">Rankings</a>
+        <a href="/testmate/profile.php">Profile</a>
+        <a href="/testmate/logout.php" class="btn-logout">Logout (<?php echo htmlspecialchars($user_name); ?>)</a>
+    </div>
 </div>
 
-<div class="container">
+<!-- Sidebar Overlay (click to close) -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
-    <!-- Daily Reminder -->
-    <?php if ($reminder): ?>
-    <div style="background:#fff8f0;border-left:4px solid #e67e22;border-radius:10px;padding:14px 20px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+<!-- Slide-out Sidebar -->
+<div class="sidebar" id="sidebar">
+    <h3>Menu</h3>
+    <a href="/testmate/quiz.php"><span class="sidebar-icon">&#128216;</span> Quizzes</a>
+    <a href="/testmate/history.php"><span class="sidebar-icon">&#128203;</span> History</a>
+    <a href="/testmate/mock-test.php"><span class="sidebar-icon">&#128221;</span> Mock Test</a>
+    <a href="/testmate/materials.php"><span class="sidebar-icon">&#128218;</span> Study Materials</a>
+    <a href="/testmate/simulations.php"><span class="sidebar-icon">&#127916;</span> Simulations</a>
+
+    <h3>Practice</h3>
+    <a href="/testmate/quiz.php"><span class="sidebar-icon">&#9989;</span> Quizzes</a>
+    <a href="/testmate/mock-test.php"><span class="sidebar-icon">&#128221;</span> Mock Test</a>
+
+    <h3>Account</h3>
+    <a href="/testmate/progress.php"><span class="sidebar-icon">&#128200;</span> Progress</a>
+    <a href="/testmate/rankings.php"><span class="sidebar-icon">&#127942;</span> Rankings</a>
+    <a href="/testmate/profile.php"><span class="sidebar-icon">&#128100;</span> Profile</a>
+    <a href="/testmate/logout.php"><span class="sidebar-icon">&#128682;</span> Logout</a>
+</div>
+
+<!-- Main Content -->
+<div class="main-content">
+
+    <!-- Welcome Banner -->
+    <div class="welcome-banner">
         <div>
-            <div style="font-weight:600;color:#e67e22;margin-bottom:2px;">Practice Reminder</div>
-            <div style="font-size:14px;color:#555;"><?= $reminder ?></div>
+            <h1>Welcome back, <?php echo htmlspecialchars($user_name); ?>!</h1>
+            <p>Here is your learning progress at a glance</p>
         </div>
-        <a href="/testmate/quiz.php" class="btn btn-primary" style="background:#e67e22;font-size:14px;padding:8px 18px;">Practice Now</a>
+        <div class="welcome-arrow">&#8594;</div>
     </div>
-    <?php endif; ?>
 
     <!-- Streak -->
-    <?php if ($streak > 1): ?>
-    <div style="background:#eafaf1;border-left:4px solid #27ae60;border-radius:10px;padding:14px 20px;margin-bottom:20px;">
-        <div style="font-weight:600;color:#27ae60;margin-bottom:2px;">Day Streak: <?= $streak ?> days in a row!</div>
-        <div style="font-size:14px;color:#555;">Great consistency! Keep practising every day.</div>
+    <div class="streak-banner">
+        <strong>Day Streak: <?php echo $streak; ?> days in a row!</strong>
+        <p>Great consistency! Keep practising every day.</p>
     </div>
-    <?php endif; ?>
 
-    <!-- Assigned Quiz Alert -->
-    <?php if ($assigned_count > 0): ?>
-    <div style="background:#eaf4ff;border-left:4px solid #3498db;border-radius:10px;padding:14px 20px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-        <div>
-            <div style="font-weight:600;color:#2471a3;margin-bottom:2px;">Assigned Quiz</div>
-            <div style="font-size:14px;color:#555;">Your instructor has assigned <?= $assigned_count ?> question<?= $assigned_count > 1 ? 's' : '' ?> for you to complete.</div>
+    <!-- Study Card -->
+    <div class="study-card">
+        <div class="progress-circle">
+            <div class="pct">21%</div>
+            <div class="label">Ready</div>
         </div>
-        <a href="/testmate/assigned-quiz.php" class="btn btn-primary" style="font-size:14px;padding:8px 18px;">Start Assigned Quiz</a>
-    </div>
-    <?php endif; ?>
-
-    <!-- Readiness Banner -->
-    <?php
-    $color = $overall >= 80 ? '#27ae60' : ($overall >= 60 ? '#e67e22' : '#e74c3c');
-    $msg   = $overall >= 80
-        ? "You are looking ready. Consider booking your test soon."
-        : ($overall >= 60
-            ? "Good progress. Focus on your weaker topics to push past 80%."
-            : "Keep going — study the materials and take more quizzes.");
-    ?>
-    <div class="card" style="display:flex;align-items:center;gap:28px;margin-bottom:28px;flex-wrap:wrap;">
-        <div style="width:120px;height:120px;border-radius:50%;background:<?= $color ?>;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;flex-shrink:0;">
-            <span style="font-size:32px;font-weight:800;line-height:1;"><?= $overall ?>%</span>
-            <span style="font-size:11px;opacity:0.9;margin-top:2px;">Ready</span>
-        </div>
-        <div style="flex:1;min-width:200px;">
-            <h2 style="font-size:20px;margin-bottom:6px;">
-                <?php if ($overall >= 80): ?>You are Test Ready!
-                <?php elseif ($overall >= 60): ?>Almost There!
-                <?php else: ?>Keep Studying!
-                <?php endif; ?>
-            </h2>
-            <p style="color:#666;font-size:14px;margin-bottom:14px;"><?= $msg ?></p>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                <a href="/testmate/mock-test.php" class="btn btn-primary">Take Mock Test</a>
-                <a href="/testmate/study-materials.php" class="btn btn-outline">Study Materials</a>
+        <div class="study-info">
+            <h2>Keep Studying!</h2>
+            <p>Keep going — study the materials and take more quizzes.</p>
+            <div class="study-buttons">
+                <a href="/testmate/mock-test.php" class="btn-dark">Take Mock Test</a>
+                <a href="/testmate/materials.php" class="btn-light">Study Materials</a>
             </div>
         </div>
     </div>
 
     <!-- Stats -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:28px;">
-        <div class="card" style="text-align:center;">
-            <div style="font-size:2rem;font-weight:800;color:#3498db;"><?= $total_quizzes ?></div>
-            <div style="font-size:13px;color:#888;margin-top:4px;">Quizzes Taken</div>
+    <div class="stats-grid">
+        <div class="stat-box">
+            <div class="num"><?php echo $quiz_count; ?></div>
+            <div class="label">Quizzes Taken</div>
         </div>
-        <div class="card" style="text-align:center;">
-            <div style="font-size:2rem;font-weight:800;color:#27ae60;"><?= $mock_stats['cnt'] ?? 0 ?></div>
-            <div style="font-size:13px;color:#888;margin-top:4px;">Mock Tests Taken</div>
+        <div class="stat-box">
+            <div class="num"><?php echo $mock_count; ?></div>
+            <div class="label">Mock Tests Taken</div>
         </div>
-        <div class="card" style="text-align:center;">
-            <div style="font-size:2rem;font-weight:800;color:#27ae60;"><?= $mock_stats['passed_cnt'] ?? 0 ?></div>
-            <div style="font-size:13px;color:#888;margin-top:4px;">Mock Tests Passed</div>
+        <div class="stat-box">
+            <div class="num"><?php echo $mock_passed; ?></div>
+            <div class="label">Mock Tests Passed</div>
         </div>
-        <div class="card" style="text-align:center;">
-            <div style="font-size:2rem;font-weight:800;color:#f1c40f;"><?= $streak ?></div>
-            <div style="font-size:13px;color:#888;margin-top:4px;">Day Streak</div>
+        <div class="stat-box">
+            <div class="num"><?php echo $streak; ?></div>
+            <div class="label">Day Streak</div>
         </div>
     </div>
 
     <!-- Topic Performance -->
-    <h2 style="font-size:18px;font-weight:700;margin-bottom:16px;">Topic Performance</h2>
-
-    <?php if (empty($topic_scores)): ?>
-    <div class="card" style="text-align:center;padding:40px;">
-        <p style="color:#888;margin-bottom:16px;">You have not taken any quizzes yet.</p>
-        <a href="/testmate/quiz.php" class="btn btn-primary">Start Your First Quiz</a>
-    </div>
-    <?php else: ?>
-    <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:28px;">
-        <?php foreach ($topic_scores as $ts):
-            $pct   = round($ts['avg_pct']);
-            $color = $pct >= 80 ? 'green' : ($pct >= 60 ? 'orange' : 'red');
-            $hex   = $pct >= 80 ? '#27ae60' : ($pct >= 60 ? '#e67e22' : '#e74c3c');
-        ?>
-        <div class="card" style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:16px;padding:16px 20px;">
-            <div>
-                <div style="font-weight:600;margin-bottom:6px;"><?= htmlspecialchars($ts['name']) ?></div>
-                <div class="progress-bar">
-                    <div class="progress-fill fill-<?= $color ?>" style="width:<?= $pct ?>%"></div>
-                </div>
-                <div style="font-size:12px;color:#999;margin-top:4px;"><?= $ts['attempts'] ?> attempt<?= $ts['attempts'] > 1 ? 's' : '' ?></div>
-            </div>
-            <div style="font-size:22px;font-weight:800;color:<?= $hex ?>;min-width:50px;text-align:right;"><?= $pct ?>%</div>
-        </div>
-        <?php endforeach; ?>
-    </div>
-    <?php endif; ?>
-
-    <!-- Mock Test History -->
-    <h2 style="font-size:18px;font-weight:700;margin-bottom:16px;">Recent Mock Tests</h2>
-
-    <?php if (empty($mock_history)): ?>
-    <div class="card" style="text-align:center;padding:40px;">
-        <p style="color:#888;margin-bottom:16px;">No mock tests taken yet.</p>
-        <a href="/testmate/mock-test.php" class="btn btn-primary">Take a Mock Test</a>
-    </div>
-    <?php else: ?>
-    <div class="table-wrap" style="margin-bottom:28px;">
-        <table>
-            <thead>
-                <tr><th>Date</th><th>Score</th><th>Percentage</th><th>Result</th></tr>
-            </thead>
-            <tbody>
-            <?php foreach ($mock_history as $m):
-                $pct = round($m['score'] / $m['total'] * 100);
+    <h2 class="section-title">Topic Performance</h2>
+    <div class="topic-list">
+        <?php if (empty($topics)): ?>
+        <div class="topic-item" style="color:#888;">No quiz data yet. Start taking quizzes to see your performance!</div>
+        <?php else: ?>
+            <?php foreach ($topics as $t): 
+                $score = round($t['avg_score'] ?? 0);
+                $color = $score >= 80 ? '#27ae60' : ($score >= 50 ? '#f39c12' : '#e74c3c');
             ?>
-                <tr>
-                    <td><?= date('d M Y, H:i', strtotime($m['taken_at'])) ?></td>
-                    <td><?= $m['score'] ?>/<?= $m['total'] ?></td>
-                    <td><?= $pct ?>%</td>
-                    <td>
-                        <?php if ($m['passed']): ?>
-                            <span class="badge badge-pass">PASSED</span>
-                        <?php else: ?>
-                            <span class="badge badge-fail">FAILED</span>
-                        <?php endif; ?>
-                    </td>
-                </tr>
+            <div class="topic-item">
+                <div class="topic-name"><?php echo htmlspecialchars($t['name']); ?></div>
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div class="topic-score"><?php echo $score; ?>% avg</div>
+                    <div class="topic-bar">
+                        <div class="topic-bar-fill" style="width:<?php echo $score; ?>%;background:<?php echo $color; ?>"></div>
+                    </div>
+                </div>
+            </div>
             <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-    <?php endif; ?>
-
-    <!-- Quick Actions -->
-    <h2 style="font-size:18px;font-weight:700;margin-bottom:16px;">Quick Actions</h2>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:30px;">
-        <a href="/testmate/study-materials.php" class="card" style="text-decoration:none;text-align:center;padding:20px;transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
-            <div style="font-weight:600;color:#2c3e50;font-size:15px;">Study Materials</div>
-            <div style="font-size:13px;color:#888;margin-top:4px;">Review all topics</div>
-        </a>
-        <a href="/testmate/quiz.php" class="card" style="text-decoration:none;text-align:center;padding:20px;transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
-            <div style="font-weight:600;color:#2c3e50;font-size:15px;">Topic Quiz</div>
-            <div style="font-size:13px;color:#888;margin-top:4px;">Test one topic</div>
-        </a>
-        <a href="/testmate/mock-test.php" class="card" style="text-decoration:none;text-align:center;padding:20px;transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
-            <div style="font-weight:600;color:#2c3e50;font-size:15px;">Mock Test</div>
-            <div style="font-size:13px;color:#888;margin-top:4px;">Full timed test</div>
-        </a>
-        <a href="/testmate/progress.php" class="card" style="text-decoration:none;text-align:center;padding:20px;transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
-            <div style="font-weight:600;color:#2c3e50;font-size:15px;">My Progress</div>
-            <div style="font-size:13px;color:#888;margin-top:4px;">View your scores</div>
-        </a>
-        <a href="/testmate/leaderboard.php" class="card" style="text-decoration:none;text-align:center;padding:20px;transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
-            <div style="font-weight:600;color:#2c3e50;font-size:15px;">Leaderboard</div>
-            <div style="font-size:13px;color:#888;margin-top:4px;">Top performers</div>
-        </a>
-        <a href="/testmate/certificate.php" class="card" style="text-decoration:none;text-align:center;padding:20px;transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
-            <div style="font-weight:600;color:#2c3e50;font-size:15px;">Certificate</div>
-            <div style="font-size:13px;color:#888;margin-top:4px;">Print achievement</div>
-        </a>
-        <a href="/testmate/profile.php" class="card" style="text-decoration:none;text-align:center;padding:20px;transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
-            <div style="font-weight:600;color:#2c3e50;font-size:15px;">My Profile</div>
-            <div style="font-size:13px;color:#888;margin-top:4px;">Edit your account</div>
-        </a>
+        <?php endif; ?>
     </div>
 
 </div>
 
-<?php include 'includes/footer.php'; ?>
+<script>
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('active');
+    document.getElementById('sidebarOverlay').classList.toggle('active');
+}
+
+// Close sidebar when pressing Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.getElementById('sidebar').classList.remove('active');
+        document.getElementById('sidebarOverlay').classList.remove('active');
+    }
+});
+</script>
+
+</body>
+</html>

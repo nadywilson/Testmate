@@ -4,19 +4,6 @@ require 'includes/db_connect.php';
 
 $user_id = $_SESSION['user_id'];
 
-// Block admins
-if ($_SESSION['role'] === 'admin') {
-    include 'includes/header.php';
-    echo '<div style="max-width:560px;margin:80px auto;text-align:center;">
-        <div style="font-size:4rem;margin-bottom:16px;">🔐</div>
-        <h2 style="font-size:22px;margin-bottom:10px;color:#2c3e50;">Administrator Account</h2>
-        <p style="color:#666;margin-bottom:24px;line-height:1.6;">Administrators cannot take practice tests.<br>Please login as a Learner to practice.</p>
-        <a href="/testmate/admin/index.php" class="btn btn-primary">Go to Admin Dashboard</a>
-    </div>';
-    include 'includes/footer.php';
-    exit();
-}
-
 $result    = $conn->query("SELECT q.*, t.name AS topic_name FROM questions q JOIN topics t ON q.topic_id = t.id ORDER BY RAND() LIMIT 50");
 $questions = $result->fetch_all(MYSQLI_ASSOC);
 ?>

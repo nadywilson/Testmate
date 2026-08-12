@@ -596,4 +596,4 @@ function saveResult(activityId, score, maxScore, timeSpent) {
 }
 </script>
 
-<?php include 'includes/footer.php'; ?>
+<?php include 'includes/footer.php'; ?>s

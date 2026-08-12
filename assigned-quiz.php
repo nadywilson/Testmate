@@ -73,10 +73,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'option_d'    => $_POST['optd'][$i],
             'explanation' => $_POST['explanations'][$i],
             'image_path'  => $_POST['images'][$i],
+            'file_type'   => $_POST['filetypes'][$i] ?? 'image',
+            'topic_id'    => $_POST['topic_ids'][$i] ?? 0,
         ];
     }
 
     $percentage = round($score / $total * 100);
+
+    // Look up topic names for the "go study this" links (assigned questions can span multiple topics)
+    $topic_names = [];
+    $tids = array_unique(array_column($results, 'topic_id'));
+    if (!empty($tids)) {
+        $in = implode(',', array_map('intval', $tids));
+        $tr = $conn->query("SELECT id, name FROM topics WHERE id IN ($in)");
+        while ($row = $tr->fetch_assoc()) { $topic_names[$row['id']] = $row['name']; }
+    }
 
     include 'includes/header.php';
     ?>
@@ -104,9 +115,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <span class="badge <?= $r['is_correct'] ? 'badge-pass' : 'badge-fail' ?>"><?= $r['is_correct'] ? 'Correct' : 'Wrong' ?></span>
             </div>
 
-            <?php if ($r['image_path']): ?>
-            <img src="<?= htmlspecialchars($r['image_path']) ?>"
-                 style="max-width:100%;max-height:200px;border-radius:8px;margin-bottom:12px;display:block;">
+            <?php if ($r['image_path']):
+                $rftype = $r['file_type'] ?? 'image';
+            ?>
+                <?php if ($rftype === 'pdf'): ?>
+                <iframe src="<?= htmlspecialchars($r['image_path']) ?>" style="width:100%;height:300px;border:1px solid #eee;border-radius:8px;margin-bottom:12px;"></iframe>
+                <?php elseif ($rftype === 'video'): ?>
+                <video src="<?= htmlspecialchars($r['image_path']) ?>" controls style="max-width:100%;max-height:250px;border-radius:8px;margin-bottom:12px;display:block;"></video>
+                <?php else: ?>
+                <img src="<?= htmlspecialchars($r['image_path']) ?>"
+                     style="max-width:100%;max-height:200px;border-radius:8px;margin-bottom:12px;display:block;">
+                <?php endif; ?>
             <?php endif; ?>
 
             <p style="font-weight:500;margin-bottom:12px;"><?= htmlspecialchars($r['question']) ?></p>
@@ -129,6 +148,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php if ($r['explanation']): ?>
             <div style="background:#f0f8ff;border-left:3px solid #3498db;padding:10px 14px;border-radius:0 6px 6px 0;font-size:13px;color:#555;">
                 <?= htmlspecialchars($r['explanation']) ?>
+            </div>
+            <?php endif; ?>
+
+            <?php if (!$r['is_correct'] && isset($topic_names[$r['topic_id']])): ?>
+            <div style="margin-top:8px;font-size:13px;color:#888;">
+                Need help with this?
+                <a href="/testmate/study-materials.php?topic=<?= $r['topic_id'] ?>&mode=read" style="color:#3498db;font-weight:600;">Read the <?= htmlspecialchars($topic_names[$r['topic_id']]) ?> notes</a>
+                or
+                <a href="/testmate/study-materials.php?topic=<?= $r['topic_id'] ?>&mode=video" style="color:#e67e22;font-weight:600;">Watch the video</a>
             </div>
             <?php endif; ?>
         </div>
@@ -160,9 +188,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <span style="font-size:12px;font-weight:700;text-transform:uppercase;color:#999;">Question <?= $i+1 ?> of <?= count($questions) ?></span>
             </div>
 
-            <?php if (!empty($q['image_path'])): ?>
-            <img src="<?= htmlspecialchars($q['image_path']) ?>"
-                 style="max-width:100%;max-height:250px;border-radius:8px;margin-bottom:12px;display:block;object-fit:contain;">
+            <?php if (!empty($q['image_path'])):
+                $ftype = $q['file_type'] ?? 'image';
+            ?>
+                <?php if ($ftype === 'pdf'): ?>
+                <iframe src="<?= htmlspecialchars($q['image_path']) ?>" style="width:100%;height:350px;border:1px solid #eee;border-radius:8px;margin-bottom:12px;display:block;"></iframe>
+                <?php elseif ($ftype === 'video'): ?>
+                <video src="<?= htmlspecialchars($q['image_path']) ?>" controls autoplay muted loop playsinline
+                       style="max-width:100%;max-height:300px;border-radius:8px;margin-bottom:12px;display:block;"></video>
+                <?php else: ?>
+                <img src="<?= htmlspecialchars($q['image_path']) ?>"
+                     style="max-width:100%;max-height:250px;border-radius:8px;margin-bottom:12px;display:block;object-fit:contain;">
+                <?php endif; ?>
             <?php endif; ?>
 
             <p style="font-size:16px;font-weight:500;margin-bottom:14px;line-height:1.6;"><?= htmlspecialchars($q['question']) ?></p>
@@ -177,6 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <input type="hidden" name="optd[]"           value="<?= htmlspecialchars($q['option_d']) ?>">
             <input type="hidden" name="explanations[]"   value="<?= htmlspecialchars($q['explanation'] ?? '') ?>">
             <input type="hidden" name="images[]"         value="<?= htmlspecialchars($q['image_path'] ?? '') ?>">
+            <input type="hidden" name="filetypes[]"      value="<?= htmlspecialchars($q['file_type'] ?? 'image') ?>">
             <input type="hidden" name="topic_ids[]"      value="<?= $q['topic_id'] ?>">
 
             <div style="display:flex;flex-direction:column;gap:8px;">

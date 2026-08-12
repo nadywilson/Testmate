@@ -5,19 +5,6 @@ require 'includes/db_connect.php';
 $user_id  = $_SESSION['user_id'];
 $topic_id = isset($_GET['topic']) ? (int)$_GET['topic'] : 0;
 
-// Block admins
-if ($_SESSION['role'] === 'admin') {
-    include 'includes/header.php';
-    echo '<div style="max-width:560px;margin:80px auto;text-align:center;">
-        <div style="font-size:4rem;margin-bottom:16px;">🔐</div>
-        <h2 style="font-size:22px;margin-bottom:10px;color:#2c3e50;">Administrator Account</h2>
-        <p style="color:#666;margin-bottom:24px;">Administrators cannot take quizzes. Please login as a Learner to practice.</p>
-        <a href="/testmate/admin/index.php" class="btn btn-primary">Go to Admin Dashboard</a>
-    </div>';
-    include 'includes/footer.php';
-    exit();
-}
-
 $topics    = $conn->query("SELECT * FROM topics ORDER BY id")->fetch_all(MYSQLI_ASSOC);
 $questions = [];
 $topic     = null;
@@ -401,6 +388,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <?php elseif ($topic_id > 0 && !empty($questions)): ?>
 
+    <!-- Start / Resume overlay -->
+    <div id="startOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;display:flex;align-items:center;justify-content:center;">
+        <div class="card" style="max-width:420px;width:90%;text-align:center;padding:40px 32px;">
+            <div style="font-size:2.5rem;margin-bottom:12px;">⏱️</div>
+            <h2 id="startOverlayTitle" style="font-size:20px;margin-bottom:10px;">Ready to start?</h2>
+            <p id="startOverlaySubtitle" style="color:#666;font-size:14px;margin-bottom:24px;line-height:1.6;">
+                You'll have 15 minutes once you begin. The timer keeps running even if you leave this page.
+            </p>
+            <button id="startOverlayBtn" class="btn btn-primary btn-lg" style="width:100%;">Start Quiz</button>
+        </div>
+    </div>
+
     <div style="max-width:750px;margin:0 auto;">
 
         <?php if ($mode === 'retry'): ?>
@@ -496,7 +495,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="dd-col-title">Values</div>
                         <div id="ddChipsBonus">
                             <?php $shuffled_vals = $bonus_pairs; shuffle($shuffled_vals); foreach ($shuffled_vals as $p): ?>
-                            <div class="dd-chip" id="bchip-<?= $p['id'] ?>" data-pair="<?= $p['id'] ?>" draggable="true" onclick="bonusSelectChip(this)"><?= htmlspecialchars($p['value']) ?></div>
+                            <div class="dd-chip" id="bchip-<?= $p['id'] ?>" data-pair="<?= $p['id'] ?>" draggable="true" onclick="bonusSelectChip(this)">
+                                <?php if (!empty($p['value_image'])): ?>
+                                <img src="<?= htmlspecialchars($p['value_image']) ?>" style="max-width:100%;max-height:80px;border-radius:6px;display:block;margin-bottom:6px;">
+                                <?php endif; ?>
+                                <?= htmlspecialchars($p['value']) ?>
+                            </div>
                             <?php endforeach; ?>
                         </div>
                     </div>
@@ -505,7 +509,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div id="ddZonesBonus">
                             <?php $shuffled_targets = $bonus_pairs; shuffle($shuffled_targets); foreach ($shuffled_targets as $p): ?>
                             <div class="dd-zone" id="bzone-<?= $p['id'] ?>" data-pair="<?= $p['id'] ?>">
-                                <div class="dd-zone-label"><?= htmlspecialchars($p['target']) ?></div>
+                                <div class="dd-zone-label">
+                                    <?php if (!empty($p['target_image'])): ?>
+                                    <img src="<?= htmlspecialchars($p['target_image']) ?>" style="max-width:100%;max-height:60px;border-radius:6px;display:block;margin-bottom:4px;">
+                                    <?php endif; ?>
+                                    <?= htmlspecialchars($p['target']) ?>
+                                </div>
                                 <div class="dd-zone-slot" id="bslot-<?= $p['id'] ?>" onclick="bonusZoneClicked('<?= $p['id'] ?>')">
                                     <span id="bslot-text-<?= $p['id'] ?>">Drop here</span>
                                 </div>
@@ -577,10 +586,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <?php endif; ?>
 
 <script>
-// 15-minute timer
+// ── Start / Resume gate + 15-minute timer ──
 const TOTAL = 15 * 60;
+const TOPIC_KEY = 'tm_quiz_progress_<?= (int)$topic_id ?>';
 let secondsLeft = TOTAL;
-const startTime = Date.now();
+let startTime = Date.now();
+let timerRunning = false;
 
 function tick() {
     const elapsed = Math.floor((Date.now() - startTime) / 1000);
@@ -601,15 +612,88 @@ function tick() {
     if (ti) ti.value = TOTAL - secondsLeft;
 
     if (secondsLeft <= 0) {
+        localStorage.removeItem(TOPIC_KEY);
         const f = document.getElementById('quizForm');
         if (f) f.submit();
         return;
     }
 }
 
-if (document.getElementById('timerDisplay')) {
+function saveProgress() {
+    const saved = { startedAt: startTime, answers: {}, dd: (typeof bonusPlacements !== 'undefined' ? bonusPlacements : {}) };
+    document.querySelectorAll('#quizForm input[type=radio]:checked').forEach(r => {
+        const qid = r.name.replace('ans_', '');
+        saved.answers[qid] = r.value;
+    });
+    localStorage.setItem(TOPIC_KEY, JSON.stringify(saved));
+}
+
+function restoreAnswers(savedAnswers) {
+    Object.entries(savedAnswers || {}).forEach(([qid, val]) => {
+        const radio = document.querySelector(`input[name="ans_${qid}"][value="${val}"]`);
+        if (radio) {
+            radio.checked = true;
+            markAnswered(qid);
+        }
+    });
+}
+
+function restoreDragDrop(savedDD) {
+    if (typeof bonusPlaceChip !== 'function') return;
+    Object.entries(savedDD || {}).forEach(([zoneId, pairId]) => {
+        bonusPlaceChip(pairId, zoneId);
+    });
+}
+
+function beginTimerAndInteraction() {
+    timerRunning = true;
     setInterval(tick, 500);
     tick();
+}
+
+if (document.getElementById('timerDisplay')) {
+    let resumeData = null;
+    try { resumeData = JSON.parse(localStorage.getItem(TOPIC_KEY)); } catch (e) {}
+
+    const overlay      = document.getElementById('startOverlay');
+    const overlayTitle = document.getElementById('startOverlayTitle');
+    const overlaySub   = document.getElementById('startOverlaySubtitle');
+    const overlayBtn   = document.getElementById('startOverlayBtn');
+    let isResume = false;
+
+    if (resumeData && resumeData.startedAt) {
+        const elapsedMs = Date.now() - resumeData.startedAt;
+        if (elapsedMs < TOTAL * 1000) {
+            isResume = true;
+            startTime = resumeData.startedAt;
+            const remain = Math.max(0, TOTAL - Math.floor(elapsedMs / 1000));
+            const rm = Math.floor(remain / 60), rs = remain % 60;
+            overlayTitle.textContent = 'Resume your quiz?';
+            overlaySub.textContent = 'You have ' + rm + ':' + String(rs).padStart(2,'0') + ' remaining from your last session.';
+            overlayBtn.textContent = 'Resume Quiz';
+        } else {
+            localStorage.removeItem(TOPIC_KEY);
+        }
+    }
+
+    overlayBtn.addEventListener('click', () => {
+        overlay.style.display = 'none';
+        if (isResume) {
+            restoreAnswers(resumeData.answers);
+            restoreDragDrop(resumeData.dd);
+        } else {
+            localStorage.setItem(TOPIC_KEY, JSON.stringify({ startedAt: startTime, answers: {}, dd: {} }));
+        }
+        beginTimerAndInteraction();
+    });
+
+    document.getElementById('quizForm').addEventListener('submit', () => {
+        localStorage.removeItem(TOPIC_KEY);
+    });
+} else {
+    // Not in quiz-taking mode (results page or topic picker) — no overlay exists
+    const ov = document.getElementById('startOverlay');
+    if (ov) ov.remove();
 }
 
 const answered = new Set();
@@ -622,6 +706,7 @@ function markAnswered(qid) {
     if (ab) ab.textContent = n + '/5 answered';
     const card = document.getElementById('card-' + qid);
     if (card) card.style.borderLeftColor = '#27ae60';
+    if (timerRunning) saveProgress();
 }
 
 function confirmSubmit() {

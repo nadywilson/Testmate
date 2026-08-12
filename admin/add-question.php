@@ -18,6 +18,29 @@ if ($edit_id > 0) {
 
 $topics = $conn->query("SELECT * FROM topics ORDER BY id")->fetch_all(MYSQLI_ASSOC);
 
+// Reusable upload helper: returns ['path' => ..., 'type' => 'image'|'video'|'pdf'] or null on no-file/failure
+function tm_upload_media($field_name, $subfolder = 'questions') {
+    if (empty($_FILES[$field_name]['name'])) return null;
+    if ($_FILES[$field_name]['error'] !== UPLOAD_ERR_OK) return null;
+
+    $ext = strtolower(pathinfo($_FILES[$field_name]['name'], PATHINFO_EXTENSION));
+    $type_map = [
+        'jpg'=>'image','jpeg'=>'image','png'=>'image','gif'=>'image','webp'=>'image',
+        'pdf'=>'pdf',
+        'mp4'=>'video','webm'=>'video','mov'=>'video',
+    ];
+    if (!isset($type_map[$ext])) return null;
+
+    $filename   = 'm_' . time() . '_' . rand(1000,9999) . '.' . $ext;
+    $upload_dir = $_SERVER['DOCUMENT_ROOT'] . "/testmate/uploads/$subfolder/";
+    if (!is_dir($upload_dir)) { mkdir($upload_dir, 0755, true); }
+
+    if (move_uploaded_file($_FILES[$field_name]['tmp_name'], $upload_dir . $filename)) {
+        return ['path' => "/testmate/uploads/$subfolder/" . $filename, 'type' => $type_map[$ext]];
+    }
+    return null;
+}
+
 // All simulations, embedded as JSON for the JS to filter by topic + know each one's animation_type
 $all_simulations = $conn->query("SELECT id, topic_id, title, animation_type FROM simulations WHERE is_active = 1 ORDER BY topic_id, id")->fetch_all(MYSQLI_ASSOC);
 
@@ -70,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$msg) {
             if ($pid > 0) {
                 $s = $conn->prepare("UPDATE questions SET topic_id=?,question=?,option_a=?,option_b=?,option_c=?,option_d=?,correct_answer=?,explanation=?,image_path=?,file_type=? WHERE id=?");
-                $s->bind_param("issssssssi", $tid,$qtext,$oa,$ob,$oc,$od,$ans,$expl,$image_path,$file_type,$pid);
+                $s->bind_param("isssssssssi", $tid,$qtext,$oa,$ob,$oc,$od,$ans,$expl,$image_path,$file_type,$pid);
                 $s->execute();
                 $msg = "✅ MCQ question updated!";
                 $eq2 = $conn->prepare("SELECT * FROM questions WHERE id = ?");
@@ -96,6 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $is_correct = ($_POST['is_correct'] ?? '') === '1';
         $expl      = trim($_POST['video_explanation']);
         $qtext     = trim($_POST['video_question']);
+        $media     = tm_upload_media('video_media', 'questions');
 
         // Fetch the simulation to append this scenario to its scenario_data JSON
         $s = $conn->prepare("SELECT * FROM simulations WHERE id = ?");
@@ -145,8 +169,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $upd->execute();
 
             $correct_answer = $is_correct ? 'correct' : 'incorrect';
-            $ins = $conn->prepare("INSERT INTO simulation_questions (simulation_id, scenario_index, question, correct_answer, explanation) VALUES (?, ?, ?, ?, ?)");
-            $ins->bind_param("iisss", $sim_id, $new_index, $qtext, $correct_answer, $expl);
+            $media_path = $media['path'] ?? null;
+            $media_type = $media['type'] ?? null;
+            $ins = $conn->prepare("INSERT INTO simulation_questions (simulation_id, scenario_index, question, correct_answer, explanation, media_path, media_type) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $ins->bind_param("iisssss", $sim_id, $new_index, $qtext, $correct_answer, $expl, $media_path, $media_type);
             $ins->execute();
 
             $msg = "✅ Video scenario added to \"" . htmlspecialchars($sim['title']) . "\"!";
@@ -158,10 +184,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tid    = (int)$_POST['dd_topic_id'];
         $value  = trim($_POST['dd_value']);
         $target = trim($_POST['dd_target']);
+        $value_media  = tm_upload_media('dd_value_media', 'dragdrop');
+        $target_media = tm_upload_media('dd_target_media', 'dragdrop');
 
         if ($tid > 0 && $value !== '' && $target !== '') {
-            $ins = $conn->prepare("INSERT INTO dragdrop_pairs (topic_id, value, target) VALUES (?, ?, ?)");
-            $ins->bind_param("iss", $tid, $value, $target);
+            $value_image  = $value_media['path'] ?? null;
+            $target_image = $target_media['path'] ?? null;
+            $ins = $conn->prepare("INSERT INTO dragdrop_pairs (topic_id, value, target, value_image, target_image) VALUES (?, ?, ?, ?, ?)");
+            $ins->bind_param("issss", $tid, $value, $target, $value_image, $target_image);
             $ins->execute();
             $msg = "✅ Drag & Drop pair added!";
         } else {
@@ -349,7 +379,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <!-- ═══════════ VIDEO SCENARIO FORM ═══════════ -->
             <?php if (!$edit_id): ?>
-            <form method="POST" id="videoForm" class="type-section" data-section="video">
+            <form method="POST" enctype="multipart/form-data" id="videoForm" class="type-section" data-section="video">
                 <input type="hidden" name="question_type" value="video">
                 <input type="hidden" name="animation_type" id="videoAnimType" value="">
 
@@ -470,6 +500,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="form-group">
+                    <label>Extra Media <span style="color:#999;font-weight:400;">(optional — a real photo, video, or PDF shown alongside the animation)</span></label>
+                    <div class="upload-area">
+                        <input type="file" name="video_media" accept="image/*,.pdf,video/*" onchange="tmPreview(this, 'videoMediaPreview')">
+                        <span style="font-size:2rem;display:block;margin-bottom:8px;">📎</span>
+                        <p style="font-size:14px;color:#666;margin:0;"><strong style="color:#3498db;">Click to upload</strong> or drag and drop</p>
+                        <p style="font-size:12px;color:#999;margin-top:4px;">JPG, PNG, GIF, WEBP, PDF, MP4, WEBM, MOV</p>
+                    </div>
+                    <p id="videoMediaPreview" style="font-size:13px;color:#27ae60;margin-top:6px;display:none;"></p>
+                </div>
+
+                <div class="form-group">
                     <label>Was this action Correct or Incorrect?</label>
                     <div class="yn-toggle">
                         <label><input type="radio" name="is_correct" value="1" checked> ✅ Correct</label>
@@ -491,7 +532,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </form>
 
             <!-- ═══════════ DRAG & DROP FORM ═══════════ -->
-            <form method="POST" id="dragdropForm" class="type-section" data-section="dragdrop">
+            <form method="POST" enctype="multipart/form-data" id="dragdropForm" class="type-section" data-section="dragdrop">
                 <input type="hidden" name="question_type" value="dragdrop">
 
                 <div class="form-group">
@@ -510,8 +551,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="form-group">
+                    <label>Value Image <span style="color:#999;font-weight:400;">(optional — e.g. a photo of a road sign)</span></label>
+                    <div class="upload-area">
+                        <input type="file" name="dd_value_media" accept="image/*" onchange="tmPreview(this, 'ddValueMediaPreview')">
+                        <span style="font-size:1.5rem;display:block;margin-bottom:4px;">📎</span>
+                        <p style="font-size:13px;color:#666;margin:0;"><strong style="color:#3498db;">Click to upload</strong> an image</p>
+                    </div>
+                    <p id="ddValueMediaPreview" style="font-size:13px;color:#27ae60;margin-top:6px;display:none;"></p>
+                </div>
+
+                <div class="form-group">
                     <label>Target <span style="color:#999;font-weight:400;">(the drop-zone text it must be matched to)</span></label>
                     <input type="text" name="dd_target" required placeholder="e.g. 60 km/h">
+                </div>
+
+                <div class="form-group">
+                    <label>Target Image <span style="color:#999;font-weight:400;">(optional)</span></label>
+                    <div class="upload-area">
+                        <input type="file" name="dd_target_media" accept="image/*" onchange="tmPreview(this, 'ddTargetMediaPreview')">
+                        <span style="font-size:1.5rem;display:block;margin-bottom:4px;">📎</span>
+                        <p style="font-size:13px;color:#666;margin:0;"><strong style="color:#3498db;">Click to upload</strong> an image</p>
+                    </div>
+                    <p id="ddTargetMediaPreview" style="font-size:13px;color:#27ae60;margin-top:6px;display:none;"></p>
                 </div>
 
                 <button type="submit" class="btn btn-primary">➕ Add Drag &amp; Drop Pair</button>
@@ -523,6 +584,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <script>
+function tmPreview(input, previewElId) {
+    const el = document.getElementById(previewElId);
+    if (input.files && input.files[0]) {
+        el.textContent = '✅ ' + input.files[0].name;
+        el.style.display = 'block';
+    } else {
+        el.style.display = 'none';
+    }
+}
+
 function previewImage(input) {
     if (input.files && input.files[0]) {
         const file = input.files[0];
@@ -586,4 +657,4 @@ function onSimulationChange() {
 }
 </script>
 </body>
-</html>s
+</html>
