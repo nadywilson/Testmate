@@ -154,7 +154,7 @@ $is_logged_in = isset($_SESSION['user_id']);
             Logout (<?= htmlspecialchars($_SESSION['name'] ?? 'User') ?>)
         </a>
     <?php else: ?>
-        <a href="/testmate/study-materials.php">Browse</a>
+<a href="/testmate/study-materials.php">Study Materials</a>
         <a href="/testmate/login.php">Login</a>
         <a href="/testmate/register.php" class="btn-nav-primary">Register Free</a>
     <?php endif; ?>

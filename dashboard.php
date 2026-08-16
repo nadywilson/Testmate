@@ -269,12 +269,8 @@ $topics = $conn->query("
     <a href="/testmate/quiz.php"><span class="sidebar-icon">&#128216;</span> Quizzes</a>
     <a href="/testmate/history.php"><span class="sidebar-icon">&#128203;</span> History</a>
     <a href="/testmate/mock-test.php"><span class="sidebar-icon">&#128221;</span> Mock Test</a>
-    <a href="/testmate/materials.php"><span class="sidebar-icon">&#128218;</span> Study Materials</a>
+    <a href="/testmate/study-materials.php"><span class="sidebar-icon">&#128218;</span> Study Materials</a>
     <a href="/testmate/simulations.php"><span class="sidebar-icon">&#127916;</span> Simulations</a>
-
-    <h3>Practice</h3>
-    <a href="/testmate/quiz.php"><span class="sidebar-icon">&#9989;</span> Quizzes</a>
-    <a href="/testmate/mock-test.php"><span class="sidebar-icon">&#128221;</span> Mock Test</a>
 
     <h3>Account</h3>
     <a href="/testmate/progress.php"><span class="sidebar-icon">&#128200;</span> Progress</a>
@@ -312,7 +308,7 @@ $topics = $conn->query("
             <p>Keep going — study the materials and take more quizzes.</p>
             <div class="study-buttons">
                 <a href="/testmate/mock-test.php" class="btn-dark">Take Mock Test</a>
-                <a href="/testmate/materials.php" class="btn-light">Study Materials</a>
+                <a href="/testmate/study-materials.php" class="btn-light">Study Materials</a>
             </div>
         </div>
     </div>

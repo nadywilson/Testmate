@@ -148,6 +148,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         .form-group input:focus { border-color: #3498db; }
 
+        .forgot-link {
+            text-align: right;
+            margin-top: -10px;
+            margin-bottom: 14px;
+        }
+        .forgot-link a {
+            font-size: 13px;
+            color: #3498db;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .forgot-link a:hover { text-decoration: underline; }
+
         .submit-btn {
             width: 100%; padding: 13px;
             border: none; border-radius: 8px;
@@ -193,12 +206,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- ── MODE SELECTOR ── -->
     <div class="mode-cards">
         <a href="/testmate/login.php?mode=admin" class="mode-card admin">
-            <span class="card-icon">🔐</span>
+            <span class="card-icon">&#128274;</span>
             <h3>Administrator</h3>
             <p>Manage content, questions and users</p>
         </a>
         <a href="/testmate/login.php?mode=learner" class="mode-card learner">
-            <span class="card-icon">🎓</span>
+            <span class="card-icon">&#127891;</span>
             <h3>Learner</h3>
             <p>Study, quiz and track your progress</p>
         </a>
@@ -211,16 +224,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- ── LOGIN FORM ── -->
     <div class="login-box">
         <button class="back-btn" onclick="location.href='/testmate/login.php'">
-            ← Back
+            &#8592; Back
         </button>
 
-        <div class="mode-badge <?= $mode ?>">
-            <?= $mode === 'admin' ? '🔐 Administrator Login' : '🎓 Learner Login' ?>
+        <div class="mode-badge <?php echo $mode; ?>">
+            <?php echo $mode === 'admin' ? '&#128274; Administrator Login' : '&#127891; Learner Login'; ?>
         </div>
 
         <?php if ($mode === 'admin'): ?>
         <div class="admin-note">
-            ⚠️ Administrator access is restricted. Only authorised personnel may login here.
+            &#9888; Administrator access is restricted. Only authorised personnel may login here.
         </div>
         <?php endif; ?>
 
@@ -228,16 +241,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <p class="sub">Enter your credentials to continue</p>
 
         <?php if ($error): ?>
-        <div class="alert-error"><?= htmlspecialchars($error) ?></div>
+        <div class="alert-error"><?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
 
         <form method="POST">
-            <input type="hidden" name="mode" value="<?= htmlspecialchars($mode) ?>">
+            <input type="hidden" name="mode" value="<?php echo htmlspecialchars($mode); ?>">
 
             <div class="form-group">
                 <label>Email Address</label>
                 <input type="email" name="email" placeholder="you@example.com"
-                       value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
+                       value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>"
                        required autofocus>
             </div>
             <div class="form-group">
@@ -245,8 +258,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="password" name="password" placeholder="Your password" required>
             </div>
 
-            <button type="submit" class="submit-btn <?= $mode ?>">
-                <?= $mode === 'admin' ? '🔐 Login as Administrator' : '🎓 Login as Learner' ?>
+            <div class="forgot-link">
+                <a href="/testmate/forgot-password.php">Forgot Password?</a>
+            </div>
+
+            <button type="submit" class="submit-btn <?php echo $mode; ?>">
+                <?php echo $mode === 'admin' ? '&#128274; Login as Administrator' : '&#127891; Login as Learner'; ?>
             </button>
         </form>
 
@@ -261,7 +278,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <div style="color:rgba(255,255,255,.3);font-size:12px;text-align:center;padding:16px;">
-    © 2026 TestMate Namibia
+    &#169; 2026 TestMate Namibia
 </div>
 
 </body>

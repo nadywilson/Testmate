@@ -56,7 +56,7 @@ $topic_stats = $conn->query("
     </a>
     <div class="nav-links">
         <a href="/testmate/index.php" style="color:rgba(255,255,255,.8);font-size:14px;">View Site</a>
-        <a href="/testmate/logout.php" class="btn-logout">Logout (<?= htmlspecialchars($name) ?>)</a>
+        <a href="/testmate/logout.php" class="btn-logout">Logout (<?php echo htmlspecialchars($name); ?>)</a>
     </div>
 </nav>
 
@@ -64,7 +64,9 @@ $topic_stats = $conn->query("
     <div class="sidebar">
         <h3>Main</h3>
         <a href="/testmate/admin/index.php" class="active">Dashboard</a>
+        <a href="/testmate/admin/review-scores.php">Review Scores</a>
         <a href="/testmate/admin/users.php">Users</a>
+        <a href="/testmate/admin/add-user.php">Add User</a>
         <a href="/testmate/admin/stats.php">Statistics</a>
         <h3>Questions</h3>
         <a href="/testmate/admin/questions.php">All Questions</a>
@@ -78,36 +80,36 @@ $topic_stats = $conn->query("
     </div>
 
     <div class="main-content">
-        <h1 style="font-size:24px;margin-bottom:4px;">Welcome, <?= htmlspecialchars($name) ?>!</h1>
+        <h1 style="font-size:24px;margin-bottom:4px;">Welcome, <?php echo htmlspecialchars($name); ?>!</h1>
         <p style="color:#888;font-size:14px;margin-bottom:24px;">Here is an overview of TestMate</p>
 
         <div class="stat-grid">
             <div class="stat-card">
-                <span class="num" style="color:#3498db;"><?= $total_users ?></span>
+                <span class="num" style="color:#3498db;"><?php echo $total_users; ?></span>
                 <span class="lbl">Registered Users</span>
             </div>
             <div class="stat-card">
-                <span class="num" style="color:#2c3e50;"><?= $total_q ?></span>
+                <span class="num" style="color:#2c3e50;"><?php echo $total_q; ?></span>
                 <span class="lbl">Questions</span>
             </div>
             <div class="stat-card">
-                <span class="num" style="color:#e67e22;"><?= $total_quizzes ?></span>
+                <span class="num" style="color:#e67e22;"><?php echo $total_quizzes; ?></span>
                 <span class="lbl">Quizzes Taken</span>
             </div>
             <div class="stat-card">
-                <span class="num" style="color:#2c3e50;"><?= $total_mocks ?></span>
+                <span class="num" style="color:#2c3e50;"><?php echo $total_mocks; ?></span>
                 <span class="lbl">Mock Tests Taken</span>
             </div>
             <div class="stat-card">
-                <span class="num" style="color:#27ae60;"><?= $total_passed ?></span>
+                <span class="num" style="color:#27ae60;"><?php echo $total_passed; ?></span>
                 <span class="lbl">Mock Tests Passed</span>
             </div>
             <div class="stat-card">
-                <span class="num" style="color:#e74c3c;"><?= $total_mocks > 0 ? round(($total_passed/$total_mocks)*100) : 0 ?>%</span>
+                <span class="num" style="color:#e74c3c;"><?php echo $total_mocks > 0 ? round(($total_passed/$total_mocks)*100) : 0; ?>%</span>
                 <span class="lbl">Pass Rate</span>
             </div>
             <div class="stat-card">
-                <span class="num" style="color:#3498db;"><?= $total_assigned ?></span>
+                <span class="num" style="color:#3498db;"><?php echo $total_assigned; ?></span>
                 <span class="lbl">Pending Assignments</span>
             </div>
         </div>
@@ -124,9 +126,9 @@ $topic_stats = $conn->query("
                             <tr><td colspan="3" style="text-align:center;color:#888;">No users yet</td></tr>
                         <?php else: foreach ($recent_users as $u): ?>
                             <tr>
-                                <td><?= htmlspecialchars($u['name']) ?></td>
-                                <td style="font-size:13px;color:#888;"><?= htmlspecialchars($u['email']) ?></td>
-                                <td style="font-size:13px;color:#888;"><?= date('d M Y', strtotime($u['created_at'])) ?></td>
+                                <td><?php echo htmlspecialchars($u['name']); ?></td>
+                                <td style="font-size:13px;color:#888;"><?php echo htmlspecialchars($u['email']); ?></td>
+                                <td style="font-size:13px;color:#888;"><?php echo date('d M Y', strtotime($u['created_at'])); ?></td>
                             </tr>
                         <?php endforeach; endif; ?>
                         </tbody>
@@ -144,13 +146,13 @@ $topic_stats = $conn->query("
                     ?>
                     <div class="card" style="padding:14px 16px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                            <span style="font-size:14px;font-weight:600;"><?= htmlspecialchars($ts['name']) ?></span>
-                            <span style="font-size:14px;font-weight:700;color:<?= $cl ?>"><?= $pct ?>%</span>
+                            <span style="font-size:14px;font-weight:600;"><?php echo htmlspecialchars($ts['name']); ?></span>
+                            <span style="font-size:14px;font-weight:700;color:<?php echo $cl; ?>"><?php echo $pct; ?>%</span>
                         </div>
                         <div class="progress-bar">
-                            <div class="progress-fill" style="width:<?= $pct ?>%;background:<?= $cl ?>;"></div>
+                            <div class="progress-fill" style="width:<?php echo $pct; ?>%;background:<?php echo $cl; ?>;"></div>
                         </div>
-                        <div style="font-size:12px;color:#999;margin-top:4px;"><?= $ts['attempts'] ?> attempts</div>
+                        <div style="font-size:12px;color:#999;margin-top:4px;"><?php echo $ts['attempts']; ?> attempts</div>
                     </div>
                     <?php endforeach; ?>
                 </div>
